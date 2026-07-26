@@ -41,7 +41,7 @@
         "squizlabs/php_codesniffer": "^3.13 || ^4.0"
     },
     "suggest": {
-        "getbible/sword": "Install the native PHP extension with: pie install getbible/sword"
+        "getbible/sword": "Install the native PHP extension with PIE: pie install 'getbible/sword:^0.1.1'"
     },
     "autoload": {
         "psr-4": {

@@ -45,6 +45,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Native extension compatibility is restricted to the tested `0.1.x` line.
 - Runtime configuration can be persisted in a versioned JSON document while
   retaining explicit environment overrides.
+- The convenient PIE installation path selects `getbible/sword` `0.1.1` or
+  later; an already-installed `0.1.0` runtime remains ABI-compatible.
 - Public documentation focuses on supported integration and operational
   constraints.
 

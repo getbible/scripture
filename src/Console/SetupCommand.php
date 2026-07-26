@@ -337,7 +337,7 @@ final class SetupCommand extends AbstractCommand
      */
     private function questionHelper(): QuestionHelper
     {
-        $helper = $this->getHelper('question');
+        $helper = $this->getHelperSet()->get('question');
 
         if (!$helper instanceof QuestionHelper) {
             throw new \LogicException('The Joomla Console question helper is unavailable.');

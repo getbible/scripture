@@ -59,7 +59,7 @@ final class MaintenanceCommandsTest extends TestCase
      */
     public function testInitializeReturnsFailureExitCode(): void
     {
-        $maintenance = $this->createMock(MaintenanceServiceInterface::class);
+        $maintenance = $this->createStub(MaintenanceServiceInterface::class);
         $maintenance->method('initialize')->willReturn(
             $this->maintenanceResult('initialize', MaintenanceModuleResult::STATUS_FAILED),
         );
