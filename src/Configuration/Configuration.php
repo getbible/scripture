@@ -372,7 +372,8 @@ final class Configuration
             return $default;
         }
 
-        if (is_array($value)
+        if (
+            is_array($value)
             || is_bool($value)
             || (is_string($value) && preg_match('/^[1-9][0-9]*$/D', trim($value)) !== 1)
         ) {

@@ -59,11 +59,13 @@ final class MaintenanceModuleResult
             throw new \InvalidArgumentException('A maintenance module result requires an identifier.');
         }
 
-        if (!in_array(
-            $status,
-            [self::STATUS_READY, self::STATUS_REFRESHED, self::STATUS_SKIPPED, self::STATUS_FAILED],
-            true,
-        )) {
+        if (
+            !in_array(
+                $status,
+                [self::STATUS_READY, self::STATUS_REFRESHED, self::STATUS_SKIPPED, self::STATUS_FAILED],
+                true,
+            )
+        ) {
             throw new \InvalidArgumentException(sprintf('Unsupported maintenance module status "%s".', $status));
         }
     }

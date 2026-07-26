@@ -76,7 +76,8 @@ final class SnapshotIndex
             throw new ContractException('Snapshot index JSON is invalid.', 0, $exception);
         }
 
-        if (!is_array($index)
+        if (
+            !is_array($index)
             || ($index['format'] ?? null) !== 'getbible.scripture.snapshot/v1'
             || !is_string($index['stream_sha256'] ?? null)
             || preg_match('/^[0-9a-f]{64}$/D', $index['stream_sha256']) !== 1
@@ -174,7 +175,8 @@ final class SnapshotIndex
     {
         $book = $this->bookData($bookKey);
 
-        if (!is_int($book['testament'] ?? null)
+        if (
+            !is_int($book['testament'] ?? null)
             || !is_int($book['position'] ?? null)
             || !is_array($book['name'] ?? null)
             || !is_array($book['abbreviation'] ?? null)
