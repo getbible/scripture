@@ -301,9 +301,8 @@ final class SnapshotIndexBehaviorTest extends TestCase
         $json = file_get_contents($generationPath . '/index.json');
         self::assertIsString($json);
         $index = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($index);
 
-        return $index;
+        return StructuredData::object($index, 'Fixture snapshot index');
     }
 
     /**

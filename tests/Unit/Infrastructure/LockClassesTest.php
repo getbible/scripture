@@ -153,7 +153,7 @@ final class LockClassesTest extends TestCase
         try {
             $lock->synchronized(
                 LOCK_EX,
-                static function (): never {
+                static function (): void {
                     throw new \RuntimeException('Expected callback failure.');
                 },
             );

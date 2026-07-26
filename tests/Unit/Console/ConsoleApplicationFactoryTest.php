@@ -66,7 +66,7 @@ final class ConsoleApplicationFactoryTest extends TestCase
         NativeRuntimeState::$extensionLoaded = true;
         NativeRuntimeState::$engineClassAvailable = true;
         NativeRuntimeState::$extensionVersion = '0.1.0';
-        \GetBible\Sword\Engine::$throwMetadata = false;
+        NativeRuntimeState::$throwMetadata = false;
 
         try {
             $container = ContainerFactory::create(Configuration::fromEnvironment([

@@ -9,6 +9,7 @@ namespace GetBible\Scripture\Tests\Unit\Console;
 use GetBible\Scripture\Console\InitializeCommand;
 use GetBible\Scripture\Console\RefreshCommand;
 use GetBible\Scripture\Console\StatusCommand;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Maintenance\MaintenanceModuleResult;
 use GetBible\Scripture\Maintenance\MaintenanceResult;
 use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
@@ -164,9 +165,10 @@ final class MaintenanceCommandsTest extends TestCase
         $input->setInteractive(false);
         $output = new BufferedOutput();
         $exitCode = $command->execute($input, $output);
-        $payload = json_decode($output->fetch(), true, 32, JSON_THROW_ON_ERROR);
-
-        self::assertIsArray($payload);
+        $payload = StructuredData::object(
+            json_decode($output->fetch(), true, 32, JSON_THROW_ON_ERROR),
+            'Maintenance command response',
+        );
 
         return [$exitCode, $payload];
     }

@@ -257,7 +257,7 @@ final class SetupCommand extends AbstractCommand
             $input,
             $output,
             'Installed translation identifiers, comma separated',
-            implode(',', is_array($currentModules) ? $currentModules : []),
+            implode(',', $currentModules),
         );
         $values['modules'] = $moduleText === null ? [] : $moduleText;
 
@@ -337,7 +337,13 @@ final class SetupCommand extends AbstractCommand
      */
     private function questionHelper(): QuestionHelper
     {
-        $helper = $this->getHelperSet()->get('question');
+        $helperSet = $this->getHelperSet();
+
+        if ($helperSet === null) {
+            throw new \LogicException('The Joomla Console question helper is unavailable.');
+        }
+
+        $helper = $helperSet->get('question');
 
         if (!$helper instanceof QuestionHelper) {
             throw new \LogicException('The Joomla Console question helper is unavailable.');

@@ -138,12 +138,7 @@ final class ConfigurationEdgeCasesTest extends TestCase
     #[DataProvider('invalidBooleanProvider')]
     public function testRejectsInvalidBooleanValues(bool|int|string|array $value): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-
-        Configuration::fromEnvironment([
-            'cache_path' => '/srv/cache',
-            'auto_refresh' => $value,
-        ]);
+        $this->assertInvalidConfigurationValue('auto_refresh', $value);
     }
 
     /**
@@ -170,12 +165,7 @@ final class ConfigurationEdgeCasesTest extends TestCase
     #[DataProvider('invalidTimeoutProvider')]
     public function testRejectsInvalidLockTimeout(bool|int|string|array $value): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-
-        Configuration::fromEnvironment([
-            'cache_path' => '/srv/cache',
-            'lock_timeout' => $value,
-        ]);
+        $this->assertInvalidConfigurationValue('lock_timeout', $value);
     }
 
     /**
@@ -205,11 +195,26 @@ final class ConfigurationEdgeCasesTest extends TestCase
     #[DataProvider('invalidModulesProvider')]
     public function testRejectsInvalidModuleLists(bool|int|string|array $value): void
     {
+        $this->assertInvalidConfigurationValue('modules', $value);
+    }
+
+    /**
+     * Passes deliberately out-of-contract input through the runtime boundary.
+     *
+     * @param string $key Configuration key.
+     * @param mixed $value Deliberately invalid value.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function assertInvalidConfigurationValue(string $key, mixed $value): void
+    {
         $this->expectException(\InvalidArgumentException::class);
 
-        Configuration::fromEnvironment([
+        $method = new \ReflectionMethod(Configuration::class, 'fromEnvironment');
+        $method->invoke(null, [
             'cache_path' => '/srv/cache',
-            'modules' => $value,
+            $key => $value,
         ]);
     }
 

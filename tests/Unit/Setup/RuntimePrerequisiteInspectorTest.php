@@ -38,7 +38,7 @@ final class RuntimePrerequisiteInspectorTest extends TestCase
         NativeRuntimeState::reset();
 
         if (\class_exists(\GetBible\Sword\Engine::class, false) && !\extension_loaded('getbiblesword')) {
-            \GetBible\Sword\Engine::$throwMetadata = false;
+            NativeRuntimeState::$throwMetadata = false;
         }
     }
 
@@ -100,7 +100,7 @@ final class RuntimePrerequisiteInspectorTest extends TestCase
         NativeRuntimeState::$extensionLoaded = true;
         NativeRuntimeState::$engineClassAvailable = true;
         NativeRuntimeState::$extensionVersion = '0.1.0';
-        \GetBible\Sword\Engine::$throwMetadata = true;
+        NativeRuntimeState::$throwMetadata = true;
 
         $report = (new RuntimePrerequisiteInspector())->inspect();
 
@@ -130,6 +130,6 @@ final class RuntimePrerequisiteInspectorTest extends TestCase
             require_once __DIR__ . '/../../Fixtures/Native/GetBible/Sword/Engine.php';
         }
 
-        \GetBible\Sword\Engine::$throwMetadata = false;
+        NativeRuntimeState::$throwMetadata = false;
     }
 }

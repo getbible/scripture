@@ -38,6 +38,22 @@ final class NativeRuntimeState
     public static string|false $extensionVersion = false;
 
     /**
+     * Extract fixture path used by the fake native engine.
+     *
+     * @var string
+     * @since 1.0.0
+     */
+    public static string $fixturePath = '';
+
+    /**
+     * Whether fake native metadata access should fail.
+     *
+     * @var bool
+     * @since 1.0.0
+     */
+    public static bool $throwMetadata = false;
+
+    /**
      * Restores the absent-extension baseline.
      *
      * @return void
@@ -48,6 +64,8 @@ final class NativeRuntimeState
         self::$extensionLoaded = false;
         self::$engineClassAvailable = false;
         self::$extensionVersion = false;
+        self::$fixturePath = '';
+        self::$throwMetadata = false;
     }
 
     /**

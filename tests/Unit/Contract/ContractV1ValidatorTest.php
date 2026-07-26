@@ -122,7 +122,8 @@ final class ContractV1ValidatorTest extends TestCase
     public function testNonStreamInputIsRejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new ContractV1Validator())->validate(null);
+        (new \ReflectionMethod(ContractV1Validator::class, 'validate'))
+            ->invoke(new ContractV1Validator(), null);
     }
 
     /**
@@ -959,7 +960,6 @@ final class ContractV1ValidatorTest extends TestCase
         self::assertIsString($contents);
         $lines = explode("\n", rtrim($contents, "\n"));
         $last = array_key_last($lines);
-        self::assertIsInt($last);
         $footer = StructuredData::object(
             json_decode($lines[$last], true, 512, JSON_THROW_ON_ERROR),
             'Generated footer',

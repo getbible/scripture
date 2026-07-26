@@ -216,7 +216,11 @@ final class DomainObjectGraphTest extends TestCase
             ) use ($fixture): int {
                 $contents = file_get_contents($fixture);
 
-                if (!is_string($contents) || fwrite($destination, $contents) !== strlen($contents)) {
+                if (
+                    !is_string($contents)
+                    || !is_resource($destination)
+                    || fwrite($destination, $contents) !== strlen($contents)
+                ) {
                     throw new \RuntimeException('Unable to copy the deterministic fixture.');
                 }
 

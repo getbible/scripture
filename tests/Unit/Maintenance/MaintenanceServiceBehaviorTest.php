@@ -140,13 +140,8 @@ final class MaintenanceServiceBehaviorTest extends TestCase
     public function testInitializeInstallsMissingSelectedModule(): void
     {
         $metadata = $this->metadata();
-        $installed = false;
         $catalog = $this->createStub(ModuleCatalogInterface::class);
-        $catalog->method('translations')->willReturnCallback(
-            static function () use (&$installed, $metadata): array {
-                return $installed ? [$metadata] : [];
-            },
-        );
+        $catalog->method('translations')->willReturnOnConsecutiveCalls([], [$metadata]);
         $snapshots = $this->createMock(SnapshotManagerInterface::class);
         $snapshots->expects(self::once())
             ->method('get')
@@ -160,9 +155,7 @@ final class MaintenanceServiceBehaviorTest extends TestCase
             ->method('install')
             ->with(['TestBible'])
             ->willReturnCallback(
-                static function () use (&$installed): ProvisioningResult {
-                    $installed = true;
-
+                static function (): ProvisioningResult {
                     return new ProvisioningResult('install', [
                         new ModuleProvisioningResult(
                             'TestBible',
@@ -223,7 +216,7 @@ final class MaintenanceServiceBehaviorTest extends TestCase
         self::assertSame('The translation is not installed.', $result->modules()[0]->message());
 
         try {
-            $service->refresh([123]);
+            (new \ReflectionMethod($service, 'refresh'))->invoke($service, [123]);
             self::fail('A non-string maintenance target was accepted.');
         } catch (\InvalidArgumentException) {
             self::addToAssertionCount(1);

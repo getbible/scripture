@@ -50,8 +50,8 @@ final class FreshContainerApplicationWarmerTest extends TestCase
         NativeRuntimeState::$extensionLoaded = true;
         NativeRuntimeState::$engineClassAvailable = true;
         NativeRuntimeState::$extensionVersion = '0.1.0';
-        \GetBible\Sword\Engine::$throwMetadata = false;
-        \GetBible\Sword\Engine::$fixturePath = __DIR__ . '/../../Fixtures/test-bible.ndjson';
+        NativeRuntimeState::$throwMetadata = false;
+        NativeRuntimeState::$fixturePath = __DIR__ . '/../../Fixtures/test-bible.ndjson';
     }
 
     /**
@@ -114,6 +114,7 @@ final class FreshContainerApplicationWarmerTest extends TestCase
         );
 
         foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
             if ($item->isDir() && !$item->isLink()) {
                 rmdir($item->getPathname());
             } else {
