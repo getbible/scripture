@@ -74,9 +74,9 @@ final class ScriptureBehaviorTest extends TestCase
             new \DateTimeImmutable('2026-08-27T12:00:00+00:00'),
         );
         $activeSnapshot = $firstSnapshot;
-        $catalog = $this->createMock(ModuleCatalogInterface::class);
+        $catalog = $this->createStub(ModuleCatalogInterface::class);
         $catalog->method('translations')->willReturn([$firstSnapshot->metadata()]);
-        $snapshots = $this->createMock(SnapshotManagerInterface::class);
+        $snapshots = $this->createStub(SnapshotManagerInterface::class);
         $snapshots->method('get')->willReturnCallback(
             static function (string $module) use (&$activeSnapshot): SnapshotIndex {
                 self::assertSame('TestBible', $module);

@@ -48,10 +48,16 @@ Direct library integration requires:
 - A readable SWORD module root.
 
 ```bash
-pie install getbible/sword
+pie install 'getbible/sword:^0.1.1'
 php --ri getbiblesword
 composer require getbible/scripture
 ```
+
+PIE owns the native-install confirmation and any administrator prompt. Version
+`0.1.1` is the first extension release whose source asset follows PIE's normal
+discovery convention. An already-installed `0.1.0` extension remains compatible
+with this package, but its published source asset cannot be installed by that
+one-command path.
 
 The extension check is intentionally strict. Composer treats PHP extensions as
 platform requirements; it verifies that `ext-getbiblesword` is loaded but does
@@ -71,6 +77,10 @@ vendor/bin/getbible-scripture scripture:setup
 `scripture:setup` validates the loaded native runtime, module and cache paths,
 installed Bible modules, refresh policy, and permissions. It does not invoke
 PIE and cannot download CrossWire modules through ABI v1.
+
+Applications can perform the same persisted configuration update through
+`SetupServiceInterface::apply()`, including immediate warm-up. See
+[programmatic setup](docs/api.md#programmatic-setup).
 
 ### Programmatic setup
 

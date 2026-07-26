@@ -64,7 +64,7 @@ RUN set -eux; \
         --output /tmp/pie.phar \
         "https://github.com/php/pie/releases/download/${PIE_VERSION}/pie.phar"; \
     echo "${PIE_SHA256}  /tmp/pie.phar" | sha256sum --check --strict; \
-    php /tmp/pie.phar install --no-cache getbible/sword; \
+    php /tmp/pie.phar install --no-cache 'getbible/sword:^0.1.1'; \
     php --ri getbiblesword; \
     rm -f /tmp/pie.phar; \
     rm -rf /var/lib/apt/lists/*

@@ -12,14 +12,20 @@ Developers adding the library to an existing Composer application install the
 native prerequisite first:
 
 ```bash
-pie install getbible/sword
+pie install 'getbible/sword:^0.1.1'
 php --ri getbiblesword
 composer require getbible/scripture
 ```
 
 The released `getbible/sword` PIE package contains the pinned getBibleSword and
 CrossWire SWORD sources. PIE builds and enables the extension for the selected
-PHP installation.
+PHP installation. PIE, rather than Composer, owns the native-install
+confirmation and any administrator prompt.
+
+Use extension package `0.1.1` or later for this one-command installation path.
+The already-published `0.1.0` runtime satisfies this library's ABI requirement
+when it is installed, but that release used a source-asset name that PIE cannot
+discover through the normal package command.
 
 ## Why Composer does not install the extension
 
@@ -66,6 +72,33 @@ PHP configuration. Composer documents that security boundary in
 PIE is the dedicated extension installer. Its supported installation methods
 and container usage are documented by the
 [PHP Installer for Extensions](https://php.github.io/pie/).
+
+## Application-owned bootstrap
+
+A product that is installed from source can still present one friendly setup
+action. Its installer should coordinate the independent tools in this order:
+
+1. check `php --ri getbiblesword`;
+2. if the extension is missing, explain the native change and ask the operator
+   for confirmation;
+3. after confirmation, invoke
+   `pie install 'getbible/sword:^0.1.1'` for the selected PHP runtime;
+4. start a new PHP process and verify `php --ri getbiblesword`;
+5. run `composer install` or `composer require getbible/scripture`;
+6. invoke `scripture:setup` and then `scripture:doctor`.
+
+The new PHP process is important: an extension enabled while Composer is
+already running cannot be loaded into that existing process. The installer is
+part of the root product, so it can express the product's supported operating
+systems, privilege policy, module licenses, and rollback behavior. A reusable
+Composer dependency cannot make those decisions for every consuming
+application.
+
+For desktop products, operating-system packages, containers, and managed
+hosting, perform these steps while building the distributable runtime. The
+recipient then launches the product without PIE, Composer, a compiler, or
+low-level commands. For a developer checkout, the three commands at the top of
+this page are the shortest supported path.
 
 ## Interactive application setup
 
