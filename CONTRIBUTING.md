@@ -17,6 +17,17 @@ composer install --ignore-platform-req=ext-getbiblesword
 composer check
 ```
 
+Generate the same coverage inventory retained by CI:
+
+```bash
+XDEBUG_MODE=coverage composer coverage
+composer coverage-inventory
+```
+
+Every public class and method must have intentional test evidence. New
+filesystem, concurrency, native-boundary, configuration, or recovery behavior
+also requires a failure-path test.
+
 ## Engineering rules
 
 - Preserve GPL-2.0-only SPDX headers on source files.

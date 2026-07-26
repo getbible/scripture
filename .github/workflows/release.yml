@@ -1,0 +1,211 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact stable version already recorded in VERSION and CHANGELOG.md
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate and publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: >-
+            ${{ github.event_name == 'workflow_dispatch'
+              && github.event.repository.default_branch
+              || github.ref }}
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: "8.4"
+          coverage: none
+          tools: composer:v2
+
+      - name: Resolve release
+        id: release
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+          PUSHED_TAG: ${{ github.ref_name }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION)"
+          tag="v$version"
+
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]]; then
+              echo "Manual releases must run from $DEFAULT_BRANCH." >&2
+              exit 1
+            fi
+            if [[ "$REQUESTED_VERSION" != "$version" ]]; then
+              echo "Requested $REQUESTED_VERSION but VERSION contains $version." >&2
+              exit 1
+            fi
+          elif [[ "$PUSHED_TAG" != "$tag" ]]; then
+            echo "Pushed tag $PUSHED_TAG does not match VERSION $version." >&2
+            exit 1
+          fi
+
+          bash scripts/validate-release.sh "$tag"
+          git fetch origin "$DEFAULT_BRANCH"
+          if ! git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH"; then
+            echo "Release commit is not contained in $DEFAULT_BRANCH." >&2
+            exit 1
+          fi
+
+          {
+            printf 'version=%s\n' "$version"
+            printf 'tag=%s\n' "$tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Validate Composer package
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --ignore-platform-req=ext-getbiblesword
+
+      - name: Run release checks
+        run: |
+          composer check
+          composer audit --no-interaction
+
+      - name: Build distribution
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          COMPOSER_ROOT_VERSION="$RELEASE_VERSION" composer archive \
+            --format=zip \
+            --dir=dist \
+            --file="getbible-scripture-${RELEASE_VERSION}"
+          (
+            cd dist
+            sha256sum "getbible-scripture-${RELEASE_VERSION}.zip" \
+              > SHA256SUMS
+            sha256sum --check --strict SHA256SUMS
+          )
+
+      - name: Verify clean distribution
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/scripture-package"
+          unzip -q \
+            "dist/getbible-scripture-${RELEASE_VERSION}.zip" \
+            -d "$RUNNER_TEMP/scripture-package"
+          package_composer="$(
+            find "$RUNNER_TEMP/scripture-package" \
+              -maxdepth 2 \
+              -type f \
+              -name composer.json \
+              -print -quit
+          )"
+          test -n "$package_composer"
+          package_root="$(dirname "$package_composer")"
+          composer validate --strict --working-dir="$package_root"
+          composer install \
+            --working-dir="$package_root" \
+            --no-dev \
+            --no-interaction \
+            --prefer-dist \
+            --ignore-platform-req=ext-getbiblesword
+          php -r '
+              require $argv[1];
+              exit(
+                  interface_exists(
+                      GetBible\Scripture\Service\ScriptureInterface::class
+                  ) ? 0 : 1
+              );
+          ' "$package_root/vendor/autoload.php"
+
+      - name: Create annotated tag
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin \
+              "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email \
+            '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag --annotate "$RELEASE_TAG" \
+            --message "getbible/scripture $RELEASE_VERSION"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+      - name: Build release notes
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v heading="## [$RELEASE_VERSION]" '
+            index($0, heading) == 1 {
+              found = 1
+              next
+            }
+            found && /^## \[/ {
+              exit
+            }
+            found {
+              print
+            }
+            END {
+              if (!found) {
+                exit 2
+              }
+            }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          test -s "$RUNNER_TEMP/release-notes.md"
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub release $RELEASE_TAG already exists." >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "GetBible Scripture $RELEASE_VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            dist/*

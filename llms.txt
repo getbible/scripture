@@ -17,8 +17,10 @@ Native dependency:
 - NDJSON contract: getbiblesword.ndjson/v1
 - SWORD engine: 1.9.0
 
-Start with README.md and docs/architecture.md. The normative protocol source is
-https://github.com/getbible/getbiblesword/blob/main/docs/contract-v1.md.
+Start with README.md, docs/installation.md, and docs/architecture.md. Product
+distributors should also read docs/distribution.md. The normative protocol
+source is:
+https://github.com/getbible/getbiblesword/blob/main/docs/contract-v1.md
 
 Important rules:
 - decoded Base64 bytes are authoritative;
@@ -28,7 +30,17 @@ Important rules:
 - introductions are not verse zero;
 - raw annotation markup is untrusted and lexically segmented, not interpreted;
 - ABI v1 cannot install or update modules;
-- constructors must not perform network operations.
+- Composer verifies ext-getbiblesword but cannot install it;
+- scripture:setup never invokes PIE, Composer, or module downloads;
+- constructors must not perform network operations;
 - scheduled work must enter through MaintenanceServiceInterface;
 - only a completely successful maintenance run advances last_success_at;
 - remote module mutation requires both runtime policy and backend capability.
+
+Setup commands:
+- vendor/bin/getbible-scripture scripture:doctor --json
+- vendor/bin/getbible-scripture scripture:setup
+
+Programmatic bootstrap:
+Configuration::fromEnvironment -> ContainerFactory::create ->
+ScriptureInterface::initialize -> Translation/Book/Chapter/Verse.

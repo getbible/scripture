@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-Security fixes are applied to the latest released minor line. Until `1.0.0`,
-only the most recent `0.x` release is supported.
+Security fixes are applied to the latest tagged release and to the default
+branch. Older release lines are not supported unless a security advisory
+explicitly states otherwise.
 
 ## Reporting
 
@@ -27,7 +28,7 @@ success state before activating a snapshot.
 Raw and rendered markup is data, not trusted HTML. Callers must escape or
 sanitize it for the destination context.
 
-Module installation is intentionally not implemented through ABI v1. A future
-provisioner must add explicit repository policy, TLS requirements, archive
-validation, licensing decisions, interprocess locks, staging, and atomic
-activation.
+Module installation is intentionally not implemented through ABI v1. Any
+injected provisioner must add explicit repository policy, TLS requirements,
+archive validation, licensing decisions, interprocess locks, staging, atomic
+activation, and rollback.

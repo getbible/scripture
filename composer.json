@@ -5,7 +5,9 @@
     "license": "GPL-2.0-only",
     "homepage": "https://github.com/getbible/scripture",
     "support": {
+        "docs": "https://github.com/getbible/scripture/tree/main/docs",
         "issues": "https://github.com/getbible/scripture/issues",
+        "security": "https://github.com/getbible/scripture/security/policy",
         "source": "https://github.com/getbible/scripture"
     },
     "authors": [
@@ -24,7 +26,7 @@
     ],
     "require": {
         "php": ">=8.2 <8.6",
-        "ext-getbiblesword": ">=0.1.0",
+        "ext-getbiblesword": "^0.1.0",
         "ext-hash": "*",
         "ext-json": "*",
         "joomla/di": "^3.1.1 || ^4.0",
@@ -64,6 +66,8 @@
         "package-validate": "composer validate --strict",
         "style": "phpcs -p --standard=ruleset.xml src tests",
         "analyse": "phpstan analyse --no-progress",
+        "coverage": "phpunit --coverage-clover build/coverage.xml --coverage-text",
+        "coverage-inventory": "php scripts/coverage-inventory.php build/coverage.xml",
         "test": "phpunit"
     },
     "config": {

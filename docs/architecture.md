@@ -36,7 +36,7 @@ extension class behind `ModuleExtractorInterface`.
 
 - LF framing;
 - consecutive sequence numbers;
-- record phase order;
+- record ordering state;
 - required record shapes;
 - canonical and hashed byte envelopes;
 - ordered annotation reconstruction;
@@ -86,9 +86,9 @@ Introductions are indexed separately and never represented as verse zero.
 ### Provisioning
 
 Native ABI v1 cannot install or update modules. `ModuleProvisionerInterface`
-and `ProvisioningCoordinatorInterface` allow the eventual native provisioning
-implementation to be injected without changing the Scripture API. Capability
-discovery keeps ABI limitations explicit. See [provisioning](provisioning.md).
+and `ProvisioningCoordinatorInterface` accept an application-supplied
+implementation without changing the Scripture API. Capability discovery keeps
+ABI limitations explicit. See [provisioning](provisioning.md).
 
 ### Automated maintenance
 
@@ -112,7 +112,7 @@ all invoke this same service. They do not reproduce lifecycle policy.
   refresh policy, and events are separate services.
 - Open/closed: ABI or persistence implementations can be added behind existing
   interfaces.
-- Liskov substitution: test engines and future native engines obey the same
+- Liskov substitution: test engines and native engine adapters obey the same
   streaming contract.
 - Interface segregation: callers depend on query, extraction, or provisioning
   contracts instead of one large manager.
@@ -134,8 +134,8 @@ acquisition has a configurable timeout; it never waits indefinitely.
 The native extension serializes SWORD access within one PHP process. Different
 processes remain independent.
 
-A future native module provisioner must additionally enforce repository,
-staging, atomic-install, and rollback policy within its own boundary. Snapshot
+Any native module provisioner must additionally enforce repository, staging,
+atomic-install, and rollback policy within its own boundary. Snapshot
 immutability does not make an in-place native install safe.
 
 ## Failure behavior

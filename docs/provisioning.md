@@ -33,13 +33,13 @@ status. Partial failure is therefore never hidden in a single boolean.
 
 The library takes a bounded exclusive application lock around provisioning.
 Native extraction takes the matching shared lock. This prevents cooperating
-Scripture processes from reading the module root during mutation. The future
+Scripture processes from reading the module root during mutation. An injected
 native backend must still provide repository validation, staged installation,
 atomic activation, and rollback guarantees.
 
-## Required production workflow
+## Provisioner security contract
 
-The planned native provisioner must:
+Every mutating provisioner must:
 
 1. select an explicit repository;
 2. enforce HTTPS/TLS policy;
@@ -60,26 +60,11 @@ All-module installation must remain an explicit operation because translations
 have independent licenses and can consume substantial disk and network
 resources.
 
-## Proposed additive native API
-
-Provisioning should be added without changing ABI v1 extraction symbols:
-
-```text
-gbs_list_remote_modules_v2
-gbs_sync_repository_v2
-gbs_install_module_v2
-gbs_update_module_v2
-gbs_remove_module_v2
-```
-
-The PHP extension should expose a separate installer/manager object rather than
-adding network side effects to `GetBible\Sword\Engine`.
-
 ## Public lifecycle
 
 ```php
-$scripture->initialize(); // explicit install of configured Bible modules
-$scripture->refresh();    // explicit remote sync + atomic update
+$scripture->initialize(); // Provision when supported, then warm snapshots.
+$scripture->refresh();    // Refresh sources when supported, then rebuild.
 $scripture->refreshIfDue();
 ```
 

@@ -1,29 +1,65 @@
 # Releasing
 
-## Before `0.1.0`
+## One-time repository setup
 
-1. Complete the Phase 1 release gates in the roadmap.
-2. Install `getbible/sword` through PIE in the integration job.
-3. Verify the package name `getbible/scripture` on Packagist.
-4. Configure Packagist's GitHub hook.
-5. Confirm the repository ruleset protects `main` and release tags.
+Before publishing any tag:
+
+1. register `https://github.com/getbible/scripture` as
+   `getbible/scripture` on Packagist;
+2. enable Packagist's GitHub synchronization hook;
+3. protect `main` and `v*.*.*` tags with repository rulesets;
+4. require every CI job, including the released-extension KJV integration;
+5. allow only the reviewed release workflow or release App to create protected
+   tags; and
+6. enable private vulnerability reporting.
+
+Packagist reads package versions from Git tags. It does not need a package
+upload or a publishing credential in the workflow.
 
 ## Release preparation
 
 1. Update `VERSION`.
-2. Move applicable changelog entries from `Unreleased` into the version.
-3. Run:
+2. Move applicable changelog entries from `Unreleased` into a dated
+   `## [VERSION] - YYYY-MM-DD` section.
+3. Confirm `composer.json` declares the exact tested PHP, Joomla Framework, and
+   native-extension compatibility.
+4. Run:
 
    ```bash
    composer check
+   composer audit
    ```
 
-4. Verify the installed-module integration workflow and retained evidence.
-5. Merge through a maintainer-reviewed pull request.
-6. Create an annotated `vVERSION` tag.
+5. Review the latest coverage inventory. Every public class and method must
+   have intentional test evidence; exclusions require a documented reason.
+6. Review the retained KJV integration evidence for Revelation 1 and 22,
+   John 3:16, metadata, initialization, and maintenance status.
+7. Verify the lowest-dependency and clean-distribution jobs.
+8. Merge through a maintainer-reviewed pull request and wait for required
+   checks on `main`.
 
-Packagist consumes the Composer package from the Git tag. The native extension
-remains a separate PIE installation.
+Changing `VERSION` does not publish the package.
+
+## Automated release
+
+Run the **Release** workflow from the default branch and enter the exact version
+already present in `VERSION` and `CHANGELOG.md`. The workflow:
+
+1. verifies stable semantic versioning and changelog alignment;
+2. confirms the release commit is contained in the default branch;
+3. runs Composer validation, tests, coding standards, static analysis, and the
+   dependency security audit;
+4. builds and installs a clean Composer archive;
+5. creates and pushes the annotated `vVERSION` tag;
+6. creates the GitHub release; and
+7. attaches the package archive and `SHA256SUMS`.
+
+A maintainer-created `v*.*.*` tag enters the same validation and publication
+path. The tag must match `VERSION` exactly and point to a commit contained in
+the default branch.
+
+The release workflow does not register Packagist or alter its settings.
+Packagist's configured GitHub hook consumes the validated tag.
 
 ## Compatibility declarations
 
@@ -37,3 +73,22 @@ A release must state:
 - SWORD engine version.
 
 Do not infer contract compatibility from the package tag alone.
+
+## Post-release verification
+
+After Packagist has synchronized:
+
+```bash
+composer clear-cache
+composer show getbible/scripture --all
+```
+
+In a clean supported runtime with the native extension already installed:
+
+```bash
+composer require getbible/scripture
+vendor/bin/getbible-scripture scripture:doctor --json
+```
+
+Confirm that the resolved package tag, extension version, ABI, contract,
+installed modules, and health output match the release record.
