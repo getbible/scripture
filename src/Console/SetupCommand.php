@@ -135,7 +135,11 @@ final class SetupCommand extends AbstractCommand
         if ($input->getOption('json') === true || !$input->isInteractive()) {
             $output->writeln($this->json($payload));
         } else {
-            $output->writeln($succeeded ? '<info>Scripture setup completed.</info>' : '<error>Scripture setup failed.</error>');
+            $output->writeln(
+                $succeeded
+                    ? '<info>Scripture setup completed.</info>'
+                    : '<error>Scripture setup failed.</error>',
+            );
             $output->writeln($this->json($payload));
         }
 

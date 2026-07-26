@@ -251,28 +251,20 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
                 throw new \UnexpectedValueException('The Scripture configuration contains an unknown setting.');
             }
 
-            if (
-                $value !== null
-                && !is_bool($value)
-                && !is_int($value)
-                && !is_string($value)
-                && !is_array($value)
-            ) {
-                throw new \UnexpectedValueException(sprintf(
-                    'The persisted Scripture setting "%s" has an invalid value.',
-                    $key,
-                ));
-            }
+            if ($key === 'modules') {
+                if (!is_array($value) || !array_is_list($value)) {
+                    throw new \UnexpectedValueException(
+                        'The persisted Scripture setting "modules" must be a list of strings.',
+                    );
+                }
 
-            if (is_array($value)) {
                 $items = [];
 
                 foreach ($value as $item) {
                     if (!is_string($item)) {
-                        throw new \UnexpectedValueException(sprintf(
-                            'The persisted Scripture setting "%s" must contain only strings.',
-                            $key,
-                        ));
+                        throw new \UnexpectedValueException(
+                            'The persisted Scripture setting "modules" must contain only strings.',
+                        );
                     }
 
                     $items[] = $item;
@@ -280,6 +272,30 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
 
                 $validated[$key] = $items;
                 continue;
+            }
+
+            $valid = match ($key) {
+                'module_path' => $value === null || is_string($value),
+                'cache_path', 'refresh_interval' => is_string($value),
+                'auto_refresh', 'provisioning_enabled', 'install_all' => is_bool($value),
+                'lock_timeout' => is_int($value),
+                default => false,
+            };
+
+            if (!$valid) {
+                $expected = match ($key) {
+                    'module_path' => 'a string or null',
+                    'cache_path', 'refresh_interval' => 'a string',
+                    'auto_refresh', 'provisioning_enabled', 'install_all' => 'a boolean',
+                    'lock_timeout' => 'an integer',
+                    default => 'a supported value',
+                };
+
+                throw new \UnexpectedValueException(sprintf(
+                    'The persisted Scripture setting "%s" must be %s.',
+                    $key,
+                    $expected,
+                ));
             }
 
             $validated[$key] = $value;

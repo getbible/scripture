@@ -44,6 +44,24 @@ final class ModuleIdentifierTest extends TestCase
     }
 
     /**
+     * Verifies invalid control bytes are rendered as bounded safe diagnostics.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testInvalidIdentifierDiagnosticIsPrintableAndBounded(): void
+    {
+        try {
+            ModuleIdentifier::normalize(str_repeat('A', 129) . "\0");
+            self::fail('The oversized identifier was accepted.');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertStringNotContainsString("\0", $exception->getMessage());
+            self::assertStringEndsWith('...".', $exception->getMessage());
+            self::assertLessThan(180, strlen($exception->getMessage()));
+        }
+    }
+
+    /**
      * Returns invalid identifier candidates.
      *
      * @return iterable<string, array{string}>

@@ -28,8 +28,18 @@ final class VerseScopeTest extends TestCase
     {
         $scope = VerseScope::fromArray($this->scope(3));
 
+        self::assertSame(2, $scope->testament());
+        self::assertSame(4, $scope->book());
+        self::assertSame(1, $scope->chapter());
+        self::assertSame(0, $scope->verse());
+        self::assertSame(0, $scope->suffix());
+        self::assertSame(0, $scope->index());
         self::assertSame('chapter', $scope->introductionScope());
         self::assertFalse($scope->isVerse());
+        self::assertSame('John', $scope->bookAbbreviation()?->requireUtf8());
+        self::assertSame('John', $scope->bookName()?->requireUtf8());
+        self::assertSame('John.1.0', $scope->osisReference()->requireUtf8());
+        self::assertSame('KJV', $scope->versification()->requireUtf8());
     }
 
     /**
@@ -46,6 +56,52 @@ final class VerseScopeTest extends TestCase
         $this->expectException(ContractException::class);
         $this->expectExceptionMessage('do not agree');
 
+        VerseScope::fromArray($scope);
+    }
+
+    /**
+     * Verifies an ordinary verse scope is positively identified.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testAcceptsOrdinaryVerseScope(): void
+    {
+        $scope = VerseScope::fromArray($this->scope(4));
+
+        self::assertTrue($scope->isVerse());
+        self::assertSame(1, $scope->verse());
+        self::assertSame(1, $scope->index());
+    }
+
+    /**
+     * Verifies a book scope cannot omit its identifying byte values.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsMissingBookIdentity(): void
+    {
+        $scope = $this->scope(4);
+        $scope['book_name'] = null;
+
+        $this->expectException(ContractException::class);
+        $this->expectExceptionMessage('requires book name');
+        VerseScope::fromArray($scope);
+    }
+
+    /**
+     * Verifies the unsigned suffix byte limit is enforced.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsOversizedSuffix(): void
+    {
+        $scope = $this->scope(4);
+        $scope['suffix'] = 256;
+
+        $this->expectException(ContractException::class);
         VerseScope::fromArray($scope);
     }
 

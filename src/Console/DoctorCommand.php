@@ -109,7 +109,11 @@ final class DoctorCommand extends AbstractCommand
         if ($input->getOption('json') === true || !$input->isInteractive()) {
             $output->writeln($this->json($result));
         } else {
-            $output->writeln($result['succeeded'] ? '<info>Scripture is ready.</info>' : '<error>Scripture is not ready.</error>');
+            $output->writeln(
+                $result['succeeded']
+                    ? '<info>Scripture is ready.</info>'
+                    : '<error>Scripture is not ready.</error>',
+            );
             $output->writeln($this->json($result));
         }
 

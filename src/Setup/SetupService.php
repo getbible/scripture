@@ -114,5 +114,4 @@ final class SetupService implements SetupServiceInterface
             $errors,
         );
     }
-
 }

@@ -17,6 +17,26 @@ use PHPUnit\Framework\TestCase;
 final class MaintenanceStateTest extends TestCase
 {
     /**
+     * Verifies empty state accessors and immediate due semantics.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testEmptyStateIsDueAndHasNoHistory(): void
+    {
+        $state = MaintenanceState::empty();
+        $now = new \DateTimeImmutable('2026-07-26T12:00:00+00:00');
+
+        self::assertTrue($state->isDue($now, new \DateInterval('P1M')));
+        self::assertNull($state->nextDueAt(new \DateInterval('P1M')));
+        self::assertNull($state->lastAttemptAt());
+        self::assertNull($state->lastSuccessAt());
+        self::assertNull($state->lastFailureAt());
+        self::assertNull($state->lastError());
+        self::assertSame(0, $state->consecutiveFailures());
+    }
+
+    /**
      * Verifies monthly due calculations from the last complete success.
      *
      * @return void
@@ -61,5 +81,83 @@ final class MaintenanceStateTest extends TestCase
         self::assertSame($failure->format(DATE_ATOM), $restored->lastFailureAt()?->format(DATE_ATOM));
         self::assertSame('Network unavailable', $restored->lastError());
         self::assertSame(1, $restored->consecutiveFailures());
+    }
+
+    /**
+     * Verifies successful recovery clears the error and failure counter.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testSuccessAfterFailureResetsFailureState(): void
+    {
+        $failure = new \DateTimeImmutable('2026-07-25T12:00:00+00:00');
+        $success = new \DateTimeImmutable('2026-07-26T12:00:00+00:00');
+        $state = MaintenanceState::empty()
+            ->failedAt($failure, ' Temporary failure. ')
+            ->succeededAt($success);
+
+        self::assertSame($success, $state->lastAttemptAt());
+        self::assertSame($success, $state->lastSuccessAt());
+        self::assertSame($failure, $state->lastFailureAt());
+        self::assertNull($state->lastError());
+        self::assertSame(0, $state->consecutiveFailures());
+    }
+
+    /**
+     * Verifies serialized state rejects invalid structures and timestamps.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testInvalidSerializedStateIsRejected(): void
+    {
+        try {
+            MaintenanceState::fromArray([]);
+            self::fail('An unsupported state structure was accepted.');
+        } catch (\UnexpectedValueException) {
+        }
+
+        try {
+            MaintenanceState::fromArray([
+                'format' => MaintenanceState::FORMAT,
+                'consecutive_failures' => 0,
+                'last_error' => [],
+            ]);
+            self::fail('A non-string last error was accepted.');
+        } catch (\UnexpectedValueException) {
+        }
+
+        try {
+            MaintenanceState::fromArray([
+                'format' => MaintenanceState::FORMAT,
+                'consecutive_failures' => 0,
+                'last_attempt_at' => 123,
+            ]);
+            self::fail('A non-string timestamp was accepted.');
+        } catch (\UnexpectedValueException) {
+        }
+
+        $this->expectException(\UnexpectedValueException::class);
+        MaintenanceState::fromArray([
+            'format' => MaintenanceState::FORMAT,
+            'consecutive_failures' => 0,
+            'last_attempt_at' => 'not a timestamp',
+        ]);
+    }
+
+    /**
+     * Verifies failed transitions require a useful diagnostic.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testFailureRequiresDiagnostic(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        MaintenanceState::empty()->failedAt(
+            new \DateTimeImmutable('2026-07-26T12:00:00+00:00'),
+            '  ',
+        );
     }
 }
