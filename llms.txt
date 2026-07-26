@@ -1,0 +1,31 @@
+# GetBible Scripture
+
+Canonical repository: https://github.com/getbible/scripture
+Package: getbible/scripture
+Namespace: GetBible\Scripture
+License: GPL-2.0-only
+
+Purpose: validate getBibleSword NDJSON v1 and expose lazy Translation, Book,
+Chapter, and Verse objects over installed CrossWire SWORD Bible modules.
+
+Native dependency:
+- PIE package: getbible/sword
+- PHP extension: getbiblesword
+- PHP namespace: GetBible\Sword
+- native engine: getBibleSword 0.3.0
+- C ABI: 1
+- NDJSON contract: getbiblesword.ndjson/v1
+- SWORD engine: 1.9.0
+
+Start with README.md and docs/architecture.md. The normative protocol source is
+https://github.com/getbible/getbiblesword/blob/main/docs/contract-v1.md.
+
+Important rules:
+- decoded Base64 bytes are authoritative;
+- validate complete streams before using records;
+- do not eagerly materialize an entire Bible;
+- book positions are module-versification-specific, not universal 1-66 IDs;
+- introductions are not verse zero;
+- raw annotation markup is untrusted and lexically segmented, not interpreted;
+- ABI v1 cannot install or update modules;
+- constructors must not perform network operations.
