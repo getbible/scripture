@@ -183,6 +183,54 @@ final class JsonConfigurationValidationTest extends TestCase
     }
 
     /**
+     * Verifies directories are never accepted as configuration documents.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsDirectoryConfigurationPath(): void
+    {
+        self::assertTrue(mkdir($this->path, 0700));
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('not a readable regular file');
+
+            (new JsonConfigurationRepository($this->path))->load();
+        } finally {
+            rmdir($this->path);
+        }
+    }
+
+    /**
+     * Verifies configuration is never written beneath a symbolic-link parent.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsSymbolicLinkConfigurationDirectory(): void
+    {
+        $target = $this->path . '.directory';
+        self::assertTrue(mkdir($target, 0700));
+        self::assertTrue(symlink($target, $this->path));
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('not a writable regular directory');
+
+            (new JsonConfigurationRepository($this->path . '/configuration.json'))->save(
+                Configuration::fromEnvironment(['cache_path' => '/srv/cache']),
+            );
+        } finally {
+            if (is_link($this->path)) {
+                unlink($this->path);
+            }
+
+            rmdir($target);
+        }
+    }
+
+    /**
      * Verifies repository construction requires an already-normalized path.
      *
      * @return void

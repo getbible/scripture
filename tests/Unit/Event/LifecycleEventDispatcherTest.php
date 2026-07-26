@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace GetBible\Scripture\Tests\Unit\Event;
 
+use GetBible\Scripture\Event\EventName;
 use GetBible\Scripture\Event\LifecycleEventDispatcher;
 use Joomla\Event\Dispatcher;
 use Joomla\Event\Event;
@@ -70,5 +71,35 @@ final class LifecycleEventDispatcherTest extends TestCase
                 ['module' => 'KJV'],
             ),
         );
+    }
+
+    /**
+     * Verifies every documented lifecycle event has a unique stable name.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testEventNamesAreStableAndUnique(): void
+    {
+        $names = [
+            EventName::WARM_STARTED,
+            EventName::WARM_COMPLETED,
+            EventName::WARM_FAILED,
+            EventName::REFRESH_STARTED,
+            EventName::REFRESH_COMPLETED,
+            EventName::REFRESH_FAILED,
+            EventName::PROVISIONING_STARTED,
+            EventName::PROVISIONING_COMPLETED,
+            EventName::PROVISIONING_FAILED,
+            EventName::MAINTENANCE_STARTED,
+            EventName::MAINTENANCE_COMPLETED,
+            EventName::MAINTENANCE_FAILED,
+        ];
+
+        self::assertCount(12, array_unique($names));
+
+        foreach ($names as $name) {
+            self::assertStringStartsWith('onGetBibleScripture', $name);
+        }
     }
 }

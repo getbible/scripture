@@ -5,7 +5,7 @@
 Install the native extension first, then install Composer dependencies:
 
 ```bash
-pie install getbible/sword
+pie install 'getbible/sword:^0.1.1'
 composer install
 composer check
 ```
@@ -26,7 +26,9 @@ composer coverage-inventory
 
 Every public class and method must have intentional test evidence. New
 filesystem, concurrency, native-boundary, configuration, or recovery behavior
-also requires a failure-path test.
+also requires a failure-path test. The coverage inventory fails when any public
+or protected implementation method was never invoked, in addition to enforcing
+the repository's statement and method coverage floors.
 
 ## Engineering rules
 

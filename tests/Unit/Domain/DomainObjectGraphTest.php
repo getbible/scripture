@@ -124,6 +124,7 @@ final class DomainObjectGraphTest extends TestCase
         $operations = [
             static fn () => $translation->book('Genesis'),
             static fn () => $translation->bookByPosition(1, 1),
+            static fn () => $book->chapter(0),
             static fn () => $book->chapter(2),
             static fn () => $chapter->verse(2),
             static fn () => $chapter->verse(1, 256),

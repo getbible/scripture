@@ -32,8 +32,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Read-only runtime and deployment diagnostics through `scripture:doctor`.
 - Reader leases, bounded generation retention, stale-staging cleanup, and
   corruption recovery for immutable snapshots.
-- Real released-extension integration against CrossWire KJV Revelation 1 and
-  22, plus retained machine-readable evidence.
+- Real released-extension integration against a locally compiled Public Domain
+  SWORD module, plus retained machine-readable evidence.
 - Coverage inventory, lowest-dependency, security-audit, and clean Composer
   distribution checks.
 - Validated tag-driven GitHub release automation.

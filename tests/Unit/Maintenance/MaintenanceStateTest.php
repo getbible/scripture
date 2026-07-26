@@ -147,6 +147,21 @@ final class MaintenanceStateTest extends TestCase
     }
 
     /**
+     * Verifies serialized state cannot contain a negative failure counter.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsNegativeFailureCounter(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        MaintenanceState::fromArray([
+            'format' => MaintenanceState::FORMAT,
+            'consecutive_failures' => -1,
+        ]);
+    }
+
+    /**
      * Verifies failed transitions require a useful diagnostic.
      *
      * @return void

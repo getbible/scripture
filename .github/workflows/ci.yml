@@ -188,9 +188,9 @@ jobs:
           retention-days: 30
 
   integration:
-    name: Released extension and CrossWire KJV
+    name: Released extension and local SWORD fixture
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -208,7 +208,7 @@ jobs:
           sudo apt-get install --yes \
             autoconf automake binutils build-essential cmake curl git \
             libbz2-dev libcurl4-openssl-dev libicu-dev liblzma-dev \
-            libtool pkg-config unzip zlib1g-dev
+            libsword-utils libtool pkg-config unzip zlib1g-dev
 
       - name: Install published getbible/sword source through PIE
         shell: bash
@@ -270,37 +270,62 @@ jobs:
             --no-cache \
             'getbible/sword:*@dev'
           php --ri getbiblesword
+          extension_path="$(
+            php -r '
+              $extension = new ReflectionExtension("getbiblesword");
+              echo $extension->getFileName();
+            '
+          )"
+          test -f "$extension_path"
+          if ldd "$extension_path" \
+              | grep -E 'lib(getbible)?sword[^[:space:]]*\.so'; then
+            echo 'The extension unexpectedly depends on a SWORD shared library.' >&2
+            exit 1
+          fi
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist
 
-      - name: Download CrossWire KJV
-        id: kjv
+      - name: Create deterministic SWORD fixture
+        id: fixture
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/sword"
-          curl \
-            --fail \
-            --location \
-            --proto '=https' \
-            --retry 3 \
-            --show-error \
-            --silent \
-            --tlsv1.2 \
-            --output "$RUNNER_TEMP/KJV.zip" \
-            https://crosswire.org/ftpmirror/pub/sword/packages/rawzip/KJV.zip
-          unzip -q "$RUNNER_TEMP/KJV.zip" -d "$RUNNER_TEMP/sword"
-          test -f "$RUNNER_TEMP/sword/mods.d/kjv.conf"
-          printf 'sha256=%s\n' \
-            "$(sha256sum "$RUNNER_TEMP/KJV.zip" | cut -d' ' -f1)" \
-            >> "$GITHUB_OUTPUT"
+          sword_utils_version="$(
+            dpkg-query --show --showformat='${Version}' libsword-utils
+          )"
+          if [[ "$sword_utils_version" != 1.9.0+dfsg-* ]]; then
+            echo "Unexpected libsword-utils version: $sword_utils_version" >&2
+            exit 1
+          fi
+          bash scripts/create-native-fixture.sh "$RUNNER_TEMP/sword"
+          fixture_tree_sha256="$(
+            find "$RUNNER_TEMP/sword" -type f -printf '%P\0' \
+              | sort --zero-terminated \
+              | while IFS= read -r -d '' relative_path; do
+                  printf '%s\0' "$relative_path"
+                  sha256sum "$RUNNER_TEMP/sword/$relative_path" \
+                    | cut --delimiter=' ' --fields=1 \
+                    | tr --delete '\n'
+                  printf '\0'
+                done \
+              | sha256sum \
+              | cut --delimiter=' ' --fields=1
+          )"
+          {
+            printf 'source_sha256=%s\n' \
+              '7ceaa7330fd234669dfc58c67294639a0a58a5a75c70efb4320a3f7adfc428a5'
+            printf 'tree_sha256=%s\n' "$fixture_tree_sha256"
+            printf 'sword_utils_version=%s\n' "$sword_utils_version"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run installed-module integration
         env:
-          KJV_SOURCE_SHA256: ${{ steps.kjv.outputs.sha256 }}
+          FIXTURE_SOURCE_SHA256: ${{ steps.fixture.outputs.source_sha256 }}
+          FIXTURE_TREE_SHA256: ${{ steps.fixture.outputs.tree_sha256 }}
+          SWORD_UTILS_VERSION: ${{ steps.fixture.outputs.sword_utils_version }}
         run: >-
-          php scripts/integration-kjv.php
+          php scripts/integration-native.php
           "$RUNNER_TEMP/sword"
           "$RUNNER_TEMP/cache"
           "build/integration-evidence.json"
@@ -309,7 +334,7 @@ jobs:
         if: always() && hashFiles('build/integration-evidence.json') != ''
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: kjv-integration-${{ github.sha }}
+          name: native-integration-${{ github.sha }}
           path: build/integration-evidence.json
           if-no-files-found: error
           retention-days: 90

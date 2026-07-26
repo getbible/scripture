@@ -8,7 +8,9 @@ namespace GetBible\Scripture\Tests\Unit\Catalog;
 
 use GetBible\Scripture\Catalog\ModuleCatalog;
 use GetBible\Scripture\Contract\ContractV1Validator;
+use GetBible\Scripture\Contract\ContractV1ValidatorInterface;
 use GetBible\Scripture\Contract\StructuredData;
+use GetBible\Scripture\Contract\ValidationResult;
 use GetBible\Scripture\Exception\ContractException;
 use GetBible\Scripture\Exception\TranslationNotFoundException;
 use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
@@ -67,10 +69,13 @@ final class ModuleCatalogFailureTest extends TestCase
     {
         $unsafe = $this->moduleRecord();
         $unsafe['name'] = $this->byteValue('../Bible');
+        $nonCanonical = $this->moduleRecord();
+        $nonCanonical['name'] = $this->byteValue(' TestBible ');
 
         foreach (
             [
                 $this->listStream([$unsafe]),
+                $this->listStream([$nonCanonical]),
                 $this->listStream([$this->moduleRecord(), $this->moduleRecord()]),
             ] as $stream
         ) {
@@ -97,6 +102,27 @@ final class ModuleCatalogFailureTest extends TestCase
         $this->expectExceptionMessage('byte count');
 
         $this->catalog($stream, strlen($stream) + 1)->translations();
+    }
+
+    /**
+     * Verifies the catalog accepts only a validated list operation.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsValidatedNonListOperation(): void
+    {
+        $extractor = $this->createStub(ModuleExtractorInterface::class);
+        $extractor->method('streamModules')->willReturn(0);
+        $validator = $this->createStub(ContractV1ValidatorInterface::class);
+        $validator->method('validate')->willReturn(new ValidationResult('extract', [], []));
+        $lock = $this->createStub(ModuleRootLockInterface::class);
+        $lock->method('read')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $catalog = new ModuleCatalog($extractor, $validator, $lock);
+
+        $this->expectException(ContractException::class);
+        $this->expectExceptionMessage('non-list');
+        $catalog->translations();
     }
 
     /**

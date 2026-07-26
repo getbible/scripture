@@ -186,8 +186,13 @@ final class DomainHydrationTest extends TestCase
         foreach (
             [
                 $this->record(3),
+                array_replace($verseRecord, ['type' => 'module']),
+                array_replace($verseRecord, ['ordinal' => -1]),
+                array_replace($verseRecord, ['scope' => null]),
+                array_replace($verseRecord, ['annotation_segments' => [null]]),
                 array_replace($verseRecord, ['projections_available' => 'yes']),
                 array_replace($verseRecord, ['annotation_segments' => []]),
+                array_replace($verseRecord, ['stripped' => null]),
                 array_replace($verseRecord, ['projections_available' => false]),
             ] as $invalid
         ) {
@@ -253,7 +258,9 @@ final class DomainHydrationTest extends TestCase
             [
                 $this->record(4),
                 array_replace($introductionRecord, ['type' => 'module']),
+                array_replace($introductionRecord, ['annotation_segments' => [null]]),
                 array_replace($introductionRecord, ['annotation_segments' => []]),
+                array_replace($introductionRecord, ['stripped' => null]),
                 array_replace($introductionRecord, ['projections_available' => false]),
             ] as $invalid
         ) {

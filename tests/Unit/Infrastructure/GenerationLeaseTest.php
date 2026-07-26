@@ -93,4 +93,49 @@ final class GenerationLeaseTest extends TestCase
         ));
         self::assertTrue($cleaned);
     }
+
+    /**
+     * Verifies explicit release is idempotent and permits cleanup.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testExplicitReleaseIsIdempotent(): void
+    {
+        $generation = str_repeat('b', 64);
+        $lease = new GenerationLease($this->moduleRoot, $generation);
+        $lease->release();
+        $lease->release();
+
+        self::assertTrue(GenerationLease::cleanup(
+            $this->moduleRoot,
+            $generation,
+            static function (): void {
+            },
+        ));
+    }
+
+    /**
+     * Verifies lease paths accept only content-addressed identifiers.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsInvalidGenerationIdentifier(): void
+    {
+        try {
+            new GenerationLease($this->moduleRoot, 'not-a-generation');
+            self::fail('An invalid generation lease identifier was accepted.');
+        } catch (\InvalidArgumentException) {
+            self::addToAssertionCount(1);
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        GenerationLease::cleanup(
+            $this->moduleRoot,
+            str_repeat('g', 64),
+            static function (): void {
+            },
+        );
+    }
 }

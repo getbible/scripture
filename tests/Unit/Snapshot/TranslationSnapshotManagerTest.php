@@ -126,6 +126,13 @@ final class TranslationSnapshotManagerTest extends TestCase
             public int $calls = 0;
 
             /**
+             * Whether extraction should fail after recording the call.
+             *
+             * @var bool
+             */
+            public bool $fail = false;
+
+            /**
              * Creates a fixture-backed extractor.
              *
              * @param string $fixture Fixture path.
@@ -171,6 +178,11 @@ final class TranslationSnapshotManagerTest extends TestCase
                 int $artifactChunkSize = 1048576,
             ): int {
                 ++$this->calls;
+
+                if ($this->fail) {
+                    throw new \RuntimeException('Expected extraction failure.');
+                }
+
                 $contents = file_get_contents($this->fixture);
 
                 if ($contents === false || fwrite($destination, $contents) !== strlen($contents)) {
@@ -279,6 +291,25 @@ final class TranslationSnapshotManagerTest extends TestCase
 
         self::assertSame('Word', $repaired->book('John')->chapter(1)->verse(1)->stripped()?->requireUtf8());
         self::assertSame(2, $extractor->calls);
+
+        $refreshed = $manager->refresh(' TestBible ');
+        self::assertSame($generation, $refreshed->generationId());
+        self::assertSame(3, $extractor->calls);
+
+        $manager->clear();
+        self::assertSame($generation, $manager->get('TestBible')->generationId());
+        self::assertSame(3, $extractor->calls);
+
+        $extractor->fail = true;
+
+        try {
+            $manager->refresh('TestBible');
+            self::fail('A native extraction failure was not propagated.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Expected extraction failure.', $exception->getMessage());
+        }
+
+        self::assertSame(4, $extractor->calls);
     }
 
     /**

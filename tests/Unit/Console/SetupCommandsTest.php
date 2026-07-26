@@ -77,6 +77,7 @@ final class SetupCommandsTest extends TestCase
                 '--config' => $path,
                 '--cache-path' => '/srv/scripture-cache',
                 '--module' => ['KJV', 'WEB'],
+                '--no-auto-refresh' => true,
                 '--no-warm' => true,
                 '--json' => true,
             ],
@@ -88,6 +89,7 @@ final class SetupCommandsTest extends TestCase
         self::assertSame('setup', $payload['operation'] ?? null);
         self::assertTrue($payload['succeeded'] ?? false);
         self::assertSame(['KJV', 'WEB'], $payload['configuration']['modules'] ?? null);
+        self::assertFalse($payload['configuration']['auto_refresh'] ?? true);
         self::assertFalse($payload['warm_requested'] ?? true);
         self::assertFileExists($path);
     }

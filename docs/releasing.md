@@ -8,7 +8,7 @@ Before publishing any tag:
    `getbible/scripture` on Packagist;
 2. enable Packagist's GitHub synchronization hook;
 3. protect `main` and `v*.*.*` tags with repository rulesets;
-4. require every CI job, including the released-extension KJV integration;
+4. require every CI job, including the released-extension native integration;
 5. allow only the reviewed release workflow or release App to create protected
    tags; and
 6. enable private vulnerability reporting.
@@ -32,10 +32,14 @@ upload or a publishing credential in the workflow.
 
 5. Review the latest coverage inventory. Every public class and method must
    have intentional test evidence; exclusions require a documented reason.
-6. Review the retained KJV integration evidence for Revelation 1 and 22,
-   John 3:16, metadata, initialization, and maintenance status.
+6. Review the retained deterministic native integration evidence for real
+   module compilation, two verse lookups, metadata, initialization, and
+   maintenance status. This required check must not depend on a live module
+   mirror.
 7. Verify the lowest-dependency and clean-distribution jobs.
-8. Merge through a maintainer-reviewed pull request and wait for required
+8. Verify `pie install 'getbible/sword:^0.1.1'` resolves a published native
+   source package for a clean supported PHP installation.
+9. Merge through a maintainer-reviewed pull request and wait for required
    checks on `main`.
 
 Changing `VERSION` does not publish the package.

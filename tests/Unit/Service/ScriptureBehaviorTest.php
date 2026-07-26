@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Tests\Unit\Service;
 
 use GetBible\Scripture\Catalog\ModuleCatalogInterface;
+use GetBible\Scripture\Domain\Translation;
 use GetBible\Scripture\Maintenance\MaintenanceResult;
 use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
 use GetBible\Scripture\Maintenance\MaintenanceState;
@@ -124,6 +125,62 @@ final class ScriptureBehaviorTest extends TestCase
         self::assertSame($provisioningResult, $scripture->refreshModules());
         self::assertSame($provisioningResult, $scripture->refreshSelectedModules(['TestBible']));
         self::assertSame($provisioningResult, $scripture->removeTranslation('TestBible'));
+    }
+
+    /**
+     * Verifies both facade insertion paths enforce their bounded LRU cache.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testTranslationCacheRemainsBounded(): void
+    {
+        $snapshot = SnapshotFixtureFactory::create($this->cachePath);
+        $catalog = $this->createStub(ModuleCatalogInterface::class);
+        $snapshots = $this->createStub(SnapshotManagerInterface::class);
+        $snapshots->method('get')->willReturn($snapshot);
+        $snapshots->method('refresh')->willReturn($snapshot);
+        $scripture = new Scripture(
+            $catalog,
+            $snapshots,
+            $this->createStub(ProvisioningCoordinatorInterface::class),
+            $this->createStub(MaintenanceServiceInterface::class),
+        );
+        $seed = new Translation('TestBible', $snapshot);
+        $property = new \ReflectionProperty(Scripture::class, 'translations');
+
+        $property->setValue($scripture, $this->fullTranslationCache($seed));
+        self::assertSame('TestBible', $scripture->translation('TestBible')->moduleName());
+        $afterGet = $property->getValue($scripture);
+        self::assertIsArray($afterGet);
+        self::assertCount(32, $afterGet);
+        self::assertArrayNotHasKey('Seed0', $afterGet);
+
+        $property->setValue($scripture, $this->fullTranslationCache($seed));
+        self::assertSame('TestBible', $scripture->refreshTranslation('TestBible')->moduleName());
+        $afterRefresh = $property->getValue($scripture);
+        self::assertIsArray($afterRefresh);
+        self::assertCount(32, $afterRefresh);
+        self::assertArrayNotHasKey('Seed0', $afterRefresh);
+    }
+
+    /**
+     * Creates a full cache state for the facade's eviction boundary.
+     *
+     * @param Translation $translation Type-safe seed value.
+     *
+     * @return array<string, Translation>
+     * @since 1.0.0
+     */
+    private function fullTranslationCache(Translation $translation): array
+    {
+        $translations = [];
+
+        for ($index = 0; $index < 32; ++$index) {
+            $translations['Seed' . $index] = $translation;
+        }
+
+        return $translations;
     }
 
     /**

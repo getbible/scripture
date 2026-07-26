@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace GetBible\Scripture\Tests\Unit\Snapshot;
 
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Exception\ContractException;
 use GetBible\Scripture\Exception\ReferenceNotFoundException;
 use GetBible\Scripture\Snapshot\SnapshotIndex;
@@ -166,6 +167,177 @@ final class SnapshotIndexBehaviorTest extends TestCase
         $this->expectExceptionMessage('integrity manifest');
 
         SnapshotIndex::open($generationPath, $activatedAt, $expiresAt);
+    }
+
+    /**
+     * Verifies invalid generation identities, incomplete files, and malformed indexes fail closed.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testOpenRejectsInvalidAndIncompleteGenerations(): void
+    {
+        $activatedAt = new \DateTimeImmutable('2026-07-26T12:00:00+00:00');
+        $expiresAt = new \DateTimeImmutable('2026-08-26T12:00:00+00:00');
+
+        try {
+            SnapshotIndex::open($this->cachePath . '/invalid', $activatedAt, $expiresAt);
+            self::fail('An invalid generation identity was accepted.');
+        } catch (ContractException $exception) {
+            self::assertStringContainsString('identity', $exception->getMessage());
+        }
+
+        $generationPath = $this->cachePath
+            . '/translations/TestBible/generations/'
+            . str_repeat('a', 64);
+        self::assertTrue(mkdir($generationPath, 0700, true));
+        self::assertNotFalse(file_put_contents($generationPath . '/index.json', "{}\n"));
+
+        try {
+            SnapshotIndex::open($generationPath, $activatedAt, $expiresAt);
+            self::fail('An incomplete generation was accepted.');
+        } catch (ContractException $exception) {
+            self::assertStringContainsString('incomplete', $exception->getMessage());
+        }
+
+        self::assertNotFalse(file_put_contents($generationPath . '/module.ndjson', "x\n"));
+        self::assertNotFalse(file_put_contents($generationPath . '/index.json', "{invalid\n"));
+
+        try {
+            SnapshotIndex::open($generationPath, $activatedAt, $expiresAt);
+            self::fail('Malformed snapshot index JSON was accepted.');
+        } catch (ContractException $exception) {
+            self::assertStringContainsString('index JSON is invalid', $exception->getMessage());
+            self::assertInstanceOf(\JsonException::class, $exception->getPrevious());
+        }
+
+        self::assertNotFalse(file_put_contents($generationPath . '/index.json', "{}\n"));
+
+        $this->expectException(ContractException::class);
+        $this->expectExceptionMessage('index structure is invalid');
+        SnapshotIndex::open($generationPath, $activatedAt, $expiresAt);
+    }
+
+    /**
+     * Verifies lazily accessed nested book and verse index structures are validated.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsMalformedNestedBookAndVerseIndexes(): void
+    {
+        $snapshot = SnapshotFixtureFactory::create($this->cachePath);
+        $generationPath = dirname($snapshot->rawExportPath());
+        $activatedAt = $snapshot->activatedAt();
+        $expiresAt = $snapshot->expiresAt();
+        unset($snapshot);
+
+        $index = $this->readIndex($generationPath);
+        $books = StructuredData::object($index['books'] ?? null, 'Fixture books');
+        $book = StructuredData::object($books['2:4'] ?? null, 'Fixture book');
+        $book['testament'] = 'invalid';
+        $books['2:4'] = $book;
+        $index['books'] = $books;
+        $snapshot = $this->writeAndOpenIndex($generationPath, $index, $activatedAt, $expiresAt);
+
+        try {
+            $snapshot->bookMetadata('2:4');
+            self::fail('Malformed nested book metadata was accepted.');
+        } catch (ContractException $exception) {
+            self::assertStringContainsString('metadata is invalid', $exception->getMessage());
+        }
+
+        unset($snapshot);
+        $index = $this->readIndex($generationPath);
+        $books = StructuredData::object($index['books'] ?? null, 'Fixture books');
+        $book = StructuredData::object($books['2:4'] ?? null, 'Fixture book');
+        $book['testament'] = 2;
+        $chapters = StructuredData::map($book['chapters'] ?? null, 'Fixture chapters');
+        $chapter = StructuredData::object($chapters['1'] ?? null, 'Fixture chapter');
+        $verses = StructuredData::object($chapter['verses'] ?? null, 'Fixture verses');
+        $location = $verses['1:0'] ?? null;
+        $chapter['verses'] = ['invalid' => $location];
+        $chapters['1'] = $chapter;
+        $book['chapters'] = $chapters;
+        $books['2:4'] = $book;
+        $index['books'] = $books;
+        $snapshot = $this->writeAndOpenIndex($generationPath, $index, $activatedAt, $expiresAt);
+
+        try {
+            $snapshot->verses('2:4', 1);
+            self::fail('A malformed verse coordinate was accepted.');
+        } catch (ContractException $exception) {
+            self::assertStringContainsString('coordinate is invalid', $exception->getMessage());
+        }
+
+        unset($snapshot);
+        $index = $this->readIndex($generationPath);
+        $books = StructuredData::object($index['books'] ?? null, 'Fixture books');
+        $book = StructuredData::object($books['2:4'] ?? null, 'Fixture book');
+        $chapters = StructuredData::map($book['chapters'] ?? null, 'Fixture chapters');
+        $chapter = StructuredData::object($chapters['1'] ?? null, 'Fixture chapter');
+        $chapter['verses'] = ['1:0' => 'invalid'];
+        $chapters['1'] = $chapter;
+        $book['chapters'] = $chapters;
+        $books['2:4'] = $book;
+        $index['books'] = $books;
+        $snapshot = $this->writeAndOpenIndex($generationPath, $index, $activatedAt, $expiresAt);
+
+        $this->expectException(ContractException::class);
+        $this->expectExceptionMessage('verse index is invalid');
+        $snapshot->verses('2:4', 1);
+    }
+
+    /**
+     * Reads a fixture index as a mutable test map.
+     *
+     * @param string $generationPath Controlled generation path.
+     *
+     * @return array<string, mixed>
+     * @since 1.0.0
+     */
+    private function readIndex(string $generationPath): array
+    {
+        $json = file_get_contents($generationPath . '/index.json');
+        self::assertIsString($json);
+        $index = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($index);
+
+        return $index;
+    }
+
+    /**
+     * Atomically replaces and opens a deliberately modified fixture index.
+     *
+     * @param string $generationPath Controlled generation path.
+     * @param array<string, mixed> $index Modified index.
+     * @param \DateTimeImmutable $activatedAt Activation time.
+     * @param \DateTimeImmutable $expiresAt Expiration time.
+     *
+     * @return SnapshotIndex
+     * @since 1.0.0
+     */
+    private function writeAndOpenIndex(
+        string $generationPath,
+        array $index,
+        \DateTimeImmutable $activatedAt,
+        \DateTimeImmutable $expiresAt,
+    ): SnapshotIndex {
+        $json = json_encode(
+            $index,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        ) . "\n";
+        self::assertSame(
+            strlen($json),
+            file_put_contents($generationPath . '/index.json', $json),
+        );
+
+        return SnapshotIndex::open(
+            $generationPath,
+            $activatedAt,
+            $expiresAt,
+            hash('sha256', $json),
+        );
     }
 
     /**
