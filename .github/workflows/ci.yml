@@ -272,8 +272,10 @@ jobs:
           php --ri getbiblesword
           extension_path="$(
             php -r '
-              $extension = new ReflectionExtension("getbiblesword");
-              echo $extension->getFileName();
+              echo rtrim((string) ini_get("extension_dir"), DIRECTORY_SEPARATOR)
+                . DIRECTORY_SEPARATOR
+                . "getbiblesword."
+                . PHP_SHLIB_SUFFIX;
             '
           )"
           test -f "$extension_path"
