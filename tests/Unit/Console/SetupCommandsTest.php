@@ -16,7 +16,9 @@ use GetBible\Scripture\Setup\RuntimePrerequisiteInspectorInterface;
 use GetBible\Scripture\Setup\RuntimePrerequisiteReport;
 use GetBible\Scripture\Setup\SetupService;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Console\Tester\CommandTester;
+use Joomla\Console\Command\AbstractCommand;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 /**
  * Verifies deterministic non-interactive setup and doctor command behavior.
@@ -74,9 +76,8 @@ final class SetupCommandsTest extends TestCase
     public function testNonInteractiveSetupIsDeterministic(): void
     {
         $path = $this->directory . '/configuration.json';
-        $tester = new CommandTester(new SetupCommand($this->service()));
-
-        $exitCode = $tester->execute(
+        [$exitCode, $display] = $this->execute(
+            new SetupCommand($this->service()),
             [
                 '--config' => $path,
                 '--cache-path' => '/srv/scripture-cache',
@@ -84,9 +85,8 @@ final class SetupCommandsTest extends TestCase
                 '--no-warm' => true,
                 '--json' => true,
             ],
-            ['interactive' => false],
         );
-        $payload = json_decode($tester->getDisplay(), true, 32, JSON_THROW_ON_ERROR);
+        $payload = json_decode($display, true, 32, JSON_THROW_ON_ERROR);
 
         self::assertSame(0, $exitCode);
         self::assertIsArray($payload);
@@ -107,27 +107,24 @@ final class SetupCommandsTest extends TestCase
     {
         $path = $this->directory . '/configuration.json';
         $service = $this->service();
-        $setup = new CommandTester(new SetupCommand($service));
-        $setup->execute(
+        $this->execute(
+            new SetupCommand($service),
             [
                 '--config' => $path,
                 '--cache-path' => '/srv/scripture-cache',
                 '--no-warm' => true,
                 '--json' => true,
             ],
-            ['interactive' => false],
         );
         $before = file_get_contents($path);
-        $tester = new CommandTester(new DoctorCommand($service));
-
-        $exitCode = $tester->execute(
+        [$exitCode, $display] = $this->execute(
+            new DoctorCommand($service),
             [
                 '--config' => $path,
                 '--json' => true,
             ],
-            ['interactive' => false],
         );
-        $payload = json_decode($tester->getDisplay(), true, 32, JSON_THROW_ON_ERROR);
+        $payload = json_decode($display, true, 32, JSON_THROW_ON_ERROR);
 
         self::assertSame(0, $exitCode);
         self::assertIsArray($payload);
@@ -149,16 +146,15 @@ final class SetupCommandsTest extends TestCase
         putenv('GETBIBLE_SCRIPTURE_CONFIG_PATH');
 
         try {
-            $tester = new CommandTester(new SetupCommand($this->service()));
-            $exitCode = $tester->execute(
+            [$exitCode, $display] = $this->execute(
+                new SetupCommand($this->service()),
                 [
                     '--cache-path' => '/srv/scripture-cache',
                     '--no-warm' => true,
                     '--json' => true,
                 ],
-                ['interactive' => false],
             );
-            $payload = json_decode($tester->getDisplay(), true, 32, JSON_THROW_ON_ERROR);
+            $payload = json_decode($display, true, 32, JSON_THROW_ON_ERROR);
 
             self::assertSame(1, $exitCode);
             self::assertIsArray($payload);
@@ -174,6 +170,25 @@ final class SetupCommandsTest extends TestCase
                 putenv('GETBIBLE_SCRIPTURE_CONFIG_PATH');
             }
         }
+    }
+
+    /**
+     * Executes a Joomla command through its public input/output boundary.
+     *
+     * @param AbstractCommand $command Command under test.
+     * @param array<string, bool|string|list<string>> $parameters Input parameters.
+     *
+     * @return array{int, string}
+     * @since 1.0.0
+     */
+    private function execute(AbstractCommand $command, array $parameters): array
+    {
+        $input = new ArrayInput($parameters);
+        $input->setInteractive(false);
+        $output = new BufferedOutput();
+        $exitCode = $command->execute($input, $output);
+
+        return [$exitCode, $output->fetch()];
     }
 
     /**
