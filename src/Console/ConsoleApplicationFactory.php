@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace GetBible\Scripture\Console;
 
+use GetBible\Scripture\DependencyInjection\ContainerService;
 use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
 use Joomla\Console\Application;
 use Joomla\DI\Container;
@@ -31,12 +32,8 @@ final class ConsoleApplicationFactory
         $application = new Application();
         $application->setName('GetBible Scripture');
         $application->setVersion(self::version());
-        $application->setDispatcher($container->get(DispatcherInterface::class));
-        $maintenance = $container->get(MaintenanceServiceInterface::class);
-
-        if (!$maintenance instanceof MaintenanceServiceInterface) {
-            throw new \LogicException('The Joomla container returned an invalid maintenance service.');
-        }
+        $application->setDispatcher(ContainerService::get($container, DispatcherInterface::class));
+        $maintenance = ContainerService::get($container, MaintenanceServiceInterface::class);
 
         $application->addCommand(new InitializeCommand($maintenance));
         $application->addCommand(new RefreshCommand($maintenance));

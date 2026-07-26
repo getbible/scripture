@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Maintenance;
 
 use GetBible\Scripture\Configuration\Configuration;
+use GetBible\Scripture\Contract\StructuredData;
 use Joomla\Filesystem\Folder;
 
 /**
@@ -56,11 +57,9 @@ final class JsonMaintenanceStateStore implements MaintenanceStateStoreInterface
             throw new \RuntimeException('Unable to decode durable maintenance state.', 0, $exception);
         }
 
-        if (!is_array($state)) {
-            throw new \RuntimeException('Durable maintenance state must be a JSON object.');
-        }
-
-        return MaintenanceState::fromArray($state);
+        return MaintenanceState::fromArray(
+            StructuredData::object($state, 'Durable maintenance state'),
+        );
     }
 
     /**

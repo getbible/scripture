@@ -66,7 +66,7 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
 
         $metadata = stream_get_meta_data($stream);
 
-        if (($metadata['mode'] ?? '') === '' || !strpbrk((string) $metadata['mode'], 'r+')) {
+        if ($metadata['mode'] === '' || !strpbrk($metadata['mode'], 'r+')) {
             throw new \InvalidArgumentException('Contract validation requires a readable stream.');
         }
 
@@ -77,6 +77,7 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
         $footer = null;
         $modules = [];
         $recordCounts = [];
+        /** @var array{error: int, info: int, warning: int} $diagnostics */
         $diagnostics = ['error' => 0, 'info' => 0, 'warning' => 0];
         $entryOrdinal = 0;
         $configSourceOrdinal = 0;
@@ -124,9 +125,10 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
                 );
             }
 
-            if (!is_array($record) || array_is_list($record)) {
-                throw new ContractException(sprintf('Record at byte %d is not a JSON object.', $offset));
-            }
+            $record = StructuredData::object(
+                $record,
+                sprintf('Record at byte %d', $offset),
+            );
 
             $type = $record['type'] ?? null;
             $sequence = $record['sequence'] ?? null;
@@ -314,7 +316,7 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
      *
      * @param array<string, mixed> $record Header record.
      *
-     * @return string
+     * @return 'extract'|'list'
      * @since 0.1.0
      */
     private function validateHeader(array $record): string
@@ -654,7 +656,7 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
      *
      * @param array<string, mixed> $record Diagnostic record.
      *
-     * @return string
+     * @return 'error'|'info'|'warning'
      * @since 0.1.0
      */
     private function validateDiagnostic(array $record): string
@@ -726,9 +728,10 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
         string $streamSha256,
     ): void {
         $footerCounts = [];
+        $serializedCounts = StructuredData::object($footer['counts'] ?? null, 'Footer counts');
 
-        foreach ($footer['counts'] as $type => $count) {
-            if (!is_string($type) || !is_int($count) || $count < 0) {
+        foreach ($serializedCounts as $type => $count) {
+            if (!is_int($count) || $count < 0) {
                 throw new ContractException('Footer record counts are invalid.');
             }
 
@@ -745,9 +748,13 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
         ksort($recordCounts);
 
         $footerDiagnostics = [];
+        $serializedDiagnostics = StructuredData::object(
+            $footer['diagnostics'] ?? null,
+            'Footer diagnostics',
+        );
 
         foreach (['error', 'info', 'warning'] as $severity) {
-            $count = $footer['diagnostics'][$severity] ?? null;
+            $count = $serializedDiagnostics[$severity] ?? null;
 
             if (!is_int($count) || $count < 0) {
                 throw new ContractException('Footer diagnostic counts are invalid.');
@@ -756,8 +763,14 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
             $footerDiagnostics[$severity] = $count;
         }
 
-        if (count($footer['diagnostics']) !== count($footerDiagnostics)) {
+        if (count($serializedDiagnostics) !== count($footerDiagnostics)) {
             throw new ContractException('Footer diagnostics contain unsupported severities.');
+        }
+
+        $footerStreamSha256 = $footer['stream_sha256'] ?? null;
+
+        if (!is_string($footerStreamSha256)) {
+            throw new ContractException('Footer stream digest is invalid.');
         }
 
         if (
@@ -766,7 +779,7 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
             || $footer['entries'] !== $entries
             || $footer['artifacts'] !== $artifacts
             || $footer['artifact_bytes'] !== $artifactBytes
-            || !hash_equals($footer['stream_sha256'], $streamSha256)
+            || !hash_equals($footerStreamSha256, $streamSha256)
         ) {
             throw new ContractException('Footer totals or stream digest do not match observed records.');
         }

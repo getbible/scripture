@@ -69,7 +69,7 @@ final class ByteValue
     /**
      * Validates and creates a byte value from a decoded JSON object.
      *
-     * @param array<string, mixed> $value Candidate envelope.
+     * @param array<array-key, mixed> $value Candidate envelope.
      * @param string $context Human-readable field context.
      *
      * @return self
@@ -77,6 +77,7 @@ final class ByteValue
      */
     public static function fromArray(array $value, string $context = 'byte value'): self
     {
+        $value = StructuredData::object($value, $context);
         $allowed = ['base64', 'encoding', 'sha256', 'size', 'utf8'];
         $unknown = array_diff(array_keys($value), $allowed);
 

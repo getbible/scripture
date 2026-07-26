@@ -39,8 +39,6 @@ final class MaintenanceStatus
         private array $configuredModules,
         private array $installedModules,
     ) {
-        $this->configuredModules = array_values($configuredModules);
-        $this->installedModules = array_values($installedModules);
     }
 
     /**

@@ -42,6 +42,8 @@ interface ModuleProvisionerInterface
     /**
      * Refreshes every installed Bible translation through the remote repository.
      *
+     * @param list<string> $modules Exact module identifiers or an empty list.
+     *
      * @return ProvisioningResult
      * @since 0.1.0
      */

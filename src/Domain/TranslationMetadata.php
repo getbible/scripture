@@ -8,6 +8,7 @@ namespace GetBible\Scripture\Domain;
 
 use GetBible\Scripture\Contract\ByteValue;
 use GetBible\Scripture\Contract\EnumValue;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Exception\ContractException;
 
 /**
@@ -66,13 +67,15 @@ final class TranslationMetadata
     /**
      * Validates and creates metadata from a module record.
      *
-     * @param array<string, mixed> $record Module record.
+     * @param array<array-key, mixed> $record Module record.
      *
      * @return self
      * @since 0.1.0
      */
     public static function fromRecord(array $record): self
     {
+        $record = StructuredData::object($record, 'Module record');
+
         if (($record['type'] ?? null) !== 'module') {
             throw new ContractException('Translation metadata requires a module record.');
         }

@@ -18,7 +18,7 @@ final class AbiV1ModuleProvisioner implements ModuleProvisionerInterface
     /**
      * Reports that ABI v1 cannot install or update modules.
      *
-     * @return bool
+     * @return ProvisioningCapabilities
      * @since 0.1.0
      */
     public function capabilities(): ProvisioningCapabilities
@@ -52,6 +52,8 @@ final class AbiV1ModuleProvisioner implements ModuleProvisionerInterface
 
     /**
      * Rejects remote refresh until a safe native API exists.
+     *
+     * @param list<string> $modules Exact module identifiers or an empty list.
      *
      * @return ProvisioningResult
      * @since 0.1.0

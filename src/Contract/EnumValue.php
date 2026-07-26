@@ -48,7 +48,7 @@ final class EnumValue
     /**
      * Validates and creates an enum from a contract object.
      *
-     * @param array<string, mixed> $value Candidate enum.
+     * @param array<array-key, mixed> $value Candidate enum.
      * @param string $context Human-readable context.
      *
      * @return self
@@ -56,6 +56,7 @@ final class EnumValue
      */
     public static function fromArray(array $value, string $context): self
     {
+        $value = StructuredData::object($value, $context);
         $code = $value['code'] ?? null;
         $name = $value['name'] ?? null;
 

@@ -29,24 +29,43 @@ final class OfficialAttributes
     /**
      * Validates and creates the complete ordered attribute map.
      *
-     * @param list<mixed> $attributes Candidate types.
+     * @param array<array-key, mixed> $attributes Candidate types.
      *
      * @return self
      * @since 0.1.0
      */
     public static function fromArray(array $attributes): self
     {
+        if (!array_is_list($attributes)) {
+            throw new ContractException('Official attributes must be an ordered list.');
+        }
+
         $types = [];
 
         foreach ($attributes as $typeIndex => $type) {
-            if (!is_array($type) || !is_array($type['name'] ?? null) || !is_array($type['lists'] ?? null)) {
+            $type = StructuredData::object(
+                $type,
+                sprintf('Official attribute type %d', $typeIndex),
+            );
+
+            if (!is_array($type['name'] ?? null)) {
                 throw new ContractException(sprintf('Official attribute type %d is invalid.', $typeIndex));
             }
 
             $lists = [];
 
-            foreach ($type['lists'] as $listIndex => $list) {
-                if (!is_array($list) || !is_array($list['name'] ?? null) || !is_array($list['values'] ?? null)) {
+            foreach (
+                StructuredData::list(
+                    $type['lists'] ?? null,
+                    sprintf('Official attribute type %d lists', $typeIndex),
+                ) as $listIndex => $list
+            ) {
+                $list = StructuredData::object(
+                    $list,
+                    sprintf('Official attribute type %d list %d', $typeIndex, $listIndex),
+                );
+
+                if (!is_array($list['name'] ?? null)) {
                     throw new ContractException(sprintf(
                         'Official attribute type %d list %d is invalid.',
                         $typeIndex,
@@ -56,8 +75,23 @@ final class OfficialAttributes
 
                 $values = [];
 
-                foreach ($list['values'] as $valueIndex => $value) {
-                    if (!is_array($value) || !is_array($value['name'] ?? null) || !is_array($value['value'] ?? null)) {
+                foreach (
+                    StructuredData::list(
+                        $list['values'] ?? null,
+                        sprintf('Official attribute type %d list %d values', $typeIndex, $listIndex),
+                    ) as $valueIndex => $value
+                ) {
+                    $value = StructuredData::object(
+                        $value,
+                        sprintf(
+                            'Official attribute type %d list %d value %d',
+                            $typeIndex,
+                            $listIndex,
+                            $valueIndex,
+                        ),
+                    );
+
+                    if (!is_array($value['name'] ?? null) || !is_array($value['value'] ?? null)) {
                         throw new ContractException(sprintf(
                             'Official attribute type %d list %d value %d is invalid.',
                             $typeIndex,

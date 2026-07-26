@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Domain;
 
 use GetBible\Scripture\Contract\ByteValue;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Exception\ContractException;
 
 /**
@@ -35,13 +36,15 @@ final class ConfigEntry
     /**
      * Validates and creates an entry from a contract record.
      *
-     * @param array<string, mixed> $record Configuration entry record.
+     * @param array<array-key, mixed> $record Configuration entry record.
      *
      * @return self
      * @since 0.1.0
      */
     public static function fromRecord(array $record): self
     {
+        $record = StructuredData::object($record, 'Configuration entry record');
+
         if (($record['type'] ?? null) !== 'config_entry') {
             throw new ContractException('ConfigEntry requires a config_entry record.');
         }

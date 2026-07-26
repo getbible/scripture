@@ -50,13 +50,15 @@ final class VerseScope
     /**
      * Validates and creates a verse-key scope from a contract object.
      *
-     * @param array<string, mixed> $scope Candidate scope.
+     * @param array<array-key, mixed> $scope Candidate scope.
      *
      * @return self
      * @since 0.1.0
      */
     public static function fromArray(array $scope): self
     {
+        $scope = StructuredData::object($scope, 'Verse scope');
+
         if (($scope['type'] ?? null) !== 'verse_key') {
             throw new ContractException('A Bible entry requires scope.type="verse_key".');
         }
