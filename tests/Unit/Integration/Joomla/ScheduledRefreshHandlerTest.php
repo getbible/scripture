@@ -26,7 +26,7 @@ final class ScheduledRefreshHandlerTest extends TestCase
      */
     public function testRunAndInvokeDelegateToRefreshIfDue(): void
     {
-        $result = $this->result();
+        $result = $this->maintenanceResult();
         $maintenance = $this->createMock(MaintenanceServiceInterface::class);
         $maintenance->expects(self::exactly(2))
             ->method('refreshIfDue')
@@ -43,7 +43,7 @@ final class ScheduledRefreshHandlerTest extends TestCase
      * @return MaintenanceResult
      * @since 1.0.0
      */
-    private function result(): MaintenanceResult
+    private function maintenanceResult(): MaintenanceResult
     {
         $time = new \DateTimeImmutable('2026-07-26T12:00:00+00:00');
 
