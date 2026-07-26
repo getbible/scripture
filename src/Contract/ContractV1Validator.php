@@ -276,7 +276,10 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
             if ($type !== 'footer') {
                 $this->validateEmbeddedByteValues($record, $type);
                 hash_update($streamHash, $line);
-                $recordCounts[$type] = ($recordCounts[$type] ?? 0) + 1;
+
+                if ($type !== 'diagnostic') {
+                    $recordCounts[$type] = ($recordCounts[$type] ?? 0) + 1;
+                }
             }
 
             $observer?->onRecord($record, $offset, $length);

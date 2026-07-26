@@ -993,7 +993,9 @@ final class ContractV1ValidatorTest extends TestCase
             $record['sequence'] = $sequence;
             $type = $record['type'];
             self::assertIsString($type);
-            $counts[$type] = ($counts[$type] ?? 0) + 1;
+            if ($type !== 'diagnostic') {
+                $counts[$type] = ($counts[$type] ?? 0) + 1;
+            }
 
             if ($type === 'entry') {
                 ++$entries;

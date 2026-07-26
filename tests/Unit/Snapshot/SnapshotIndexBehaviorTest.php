@@ -214,7 +214,7 @@ final class SnapshotIndexBehaviorTest extends TestCase
         self::assertNotFalse(file_put_contents($generationPath . '/index.json', "{}\n"));
 
         $this->expectException(ContractException::class);
-        $this->expectExceptionMessage('index structure is invalid');
+        $this->expectExceptionMessage('Snapshot index must be a JSON object');
         SnapshotIndex::open($generationPath, $activatedAt, $expiresAt);
     }
 
