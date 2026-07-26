@@ -55,7 +55,8 @@ final class Introduction
      */
     public static function fromRecord(array $record): self
     {
-        if (($record['type'] ?? null) !== 'entry'
+        if (
+            ($record['type'] ?? null) !== 'entry'
             || !is_array($record['scope'] ?? null)
             || !is_array($record['key'] ?? null)
             || !is_array($record['raw'] ?? null)

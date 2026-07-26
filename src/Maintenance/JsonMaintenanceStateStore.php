@@ -100,7 +100,8 @@ final class JsonMaintenanceStateStore implements MaintenanceStateStoreInterface
         try {
             $written = fwrite($stream, $json);
 
-            if ($written !== strlen($json)
+            if (
+                $written !== strlen($json)
                 || fflush($stream) === false
                 || (function_exists('fsync') && fsync($stream) === false)
             ) {

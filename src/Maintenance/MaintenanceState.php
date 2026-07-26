@@ -64,7 +64,8 @@ final class MaintenanceState
      */
     public static function fromArray(array $state): self
     {
-        if (($state['format'] ?? null) !== self::FORMAT
+        if (
+            ($state['format'] ?? null) !== self::FORMAT
             || !is_int($state['consecutive_failures'] ?? null)
         ) {
             throw new \UnexpectedValueException('Maintenance state has an unsupported structure.');

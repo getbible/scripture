@@ -325,7 +325,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
             throw new ContractException('Header command must be "list" or "extract".');
         }
 
-        if (($record['contract'] ?? null) !== self::CONTRACT
+        if (
+            ($record['contract'] ?? null) !== self::CONTRACT
             || ($record['contract_version'] ?? null) !== 1
             || ($record['deterministic'] ?? null) !== true
             || ($record['producer'] ?? null) !== 'getBibleSword'
@@ -378,7 +379,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
      */
     private function validateConfigSource(array $record, int $expectedOrdinal): void
     {
-        if (($record['ordinal'] ?? null) !== $expectedOrdinal
+        if (
+            ($record['ordinal'] ?? null) !== $expectedOrdinal
             || !is_array($record['path'] ?? null)
             || !is_array($record['raw'] ?? null)
         ) {
@@ -401,7 +403,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
      */
     private function validateEntry(array $record, int $expectedOrdinal): void
     {
-        if (($record['ordinal'] ?? null) !== $expectedOrdinal
+        if (
+            ($record['ordinal'] ?? null) !== $expectedOrdinal
             || !is_array($record['key'] ?? null)
             || !is_array($record['raw'] ?? null)
             || !is_array($record['scope'] ?? null)
@@ -486,7 +489,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
         $mode = $record['mode'] ?? null;
         $role = $record['role'] ?? null;
 
-        if (($record['artifact_id'] ?? null) !== $expectedId
+        if (
+            ($record['artifact_id'] ?? null) !== $expectedId
             || !is_string($type)
             || !in_array($type, ['regular', 'directory', 'symlink'], true)
             || !is_int($mode)
@@ -563,7 +567,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
      */
     private function validateArtifactChunk(array $record, array $state): string
     {
-        if ($state['type'] !== 'regular'
+        if (
+            $state['type'] !== 'regular'
             || ($record['artifact_id'] ?? null) !== $state['id']
             || ($record['index'] ?? null) !== $state['chunk']
             || !is_array($record['data'] ?? null)
@@ -609,7 +614,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
         $size = $record['size'] ?? null;
         $sha256 = $record['sha256'] ?? null;
 
-        if (($record['artifact_id'] ?? null) !== $state['id']
+        if (
+            ($record['artifact_id'] ?? null) !== $state['id']
             || !is_int($size)
             || $size < 0
             || !is_string($sha256)
@@ -655,7 +661,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
     {
         $severity = $record['severity'] ?? null;
 
-        if (!is_string($record['code'] ?? null)
+        if (
+            !is_string($record['code'] ?? null)
             || !is_string($severity)
             || !in_array($severity, ['error', 'info', 'warning'], true)
             || !is_array($record['message'] ?? null)
@@ -678,7 +685,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
      */
     private function validateFooterShape(array $footer): void
     {
-        if (!is_array($footer['counts'] ?? null)
+        if (
+            !is_array($footer['counts'] ?? null)
             || !is_array($footer['diagnostics'] ?? null)
             || !is_int($footer['entries'] ?? null)
             || $footer['entries'] < 0
@@ -752,7 +760,8 @@ final class ContractV1Validator implements ContractV1ValidatorInterface
             throw new ContractException('Footer diagnostics contain unsupported severities.');
         }
 
-        if ($footerCounts !== $recordCounts
+        if (
+            $footerCounts !== $recordCounts
             || $footerDiagnostics !== $diagnostics
             || $footer['entries'] !== $entries
             || $footer['artifacts'] !== $artifacts

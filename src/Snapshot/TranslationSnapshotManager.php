@@ -70,7 +70,8 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
         $module = $this->validateModule($module);
         $snapshot = $this->snapshots[$module] ?? $this->openCurrent($module);
 
-        if ($snapshot !== null
+        if (
+            $snapshot !== null
             && (!$this->configuration->autoRefresh() || !$snapshot->isExpired($this->clock->now()))
         ) {
             return $this->snapshots[$module] = $snapshot;
@@ -156,7 +157,8 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             if (!$force) {
                 $current = $this->openCurrent($module);
 
-                if ($current !== null
+                if (
+                    $current !== null
                     && (!$this->configuration->autoRefresh() || !$current->isExpired($this->clock->now()))
                 ) {
                     return $this->snapshots[$module] = $current;
@@ -249,7 +251,8 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             $observer = new SnapshotRecordObserver();
             $result = $this->validator->validate($stream, $observer);
 
-            if ($result->command() !== 'extract'
+            if (
+                $result->command() !== 'extract'
                 || count($result->modules()) !== 1
                 || $result->modules()[0]->name()->bytes() !== $module
                 || !$result->modules()[0]->isBible()
@@ -333,7 +336,8 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             return null;
         }
 
-        if (!is_array($pointer)
+        if (
+            !is_array($pointer)
             || ($pointer['format'] ?? null) !== 'getbible.scripture.current/v1'
             || !is_string($pointer['generation'] ?? null)
             || preg_match('/^[0-9a-f]{64}$/D', $pointer['generation']) !== 1
@@ -380,7 +384,8 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
      */
     private function validateModule(string $module): string
     {
-        if ($module === ''
+        if (
+            $module === ''
             || $module === '.'
             || $module === '..'
             || preg_match('/^[A-Za-z0-9_.+-]+$/D', $module) !== 1

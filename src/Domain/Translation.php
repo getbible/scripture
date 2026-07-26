@@ -80,7 +80,8 @@ final class Translation
             $name = $book->name()->bytes();
             $abbreviation = $book->abbreviation()->bytes();
 
-            if ($identifier === $name
+            if (
+                $identifier === $name
                 || $identifier === $abbreviation
                 || strcasecmp($identifier, $name) === 0
                 || strcasecmp($identifier, $abbreviation) === 0

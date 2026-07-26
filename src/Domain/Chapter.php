@@ -85,7 +85,8 @@ final class Chapter
      */
     public function verses(?int $start = null, ?int $end = null): array
     {
-        if (($start !== null && $start < 1)
+        if (
+            ($start !== null && $start < 1)
             || ($end !== null && $end < 1)
             || ($start !== null && $end !== null && $end < $start)
         ) {
