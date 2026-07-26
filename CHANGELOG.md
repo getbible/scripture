@@ -21,6 +21,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Ordered per-module provisioning outcomes.
 - Bounded shared/exclusive module-root lifecycle locking.
 - Provisioning lifecycle events and atomic process-cache invalidation.
+- Durable initialization, refresh, and interval-gated refresh services.
+- Per-module maintenance failure isolation and durable failure state.
+- Joomla Console initialization, refresh, and status commands.
+- Joomla Scheduled Tasks callable integration.
+- Production cron, systemd, health-check, and scheduler documentation.
 
 ### Changed
 

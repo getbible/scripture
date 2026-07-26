@@ -1,0 +1,21 @@
+#!/usr/bin/env php
+<?php
+
+// SPDX-License-Identifier: GPL-2.0-only
+
+declare(strict_types=1);
+
+use GetBible\Scripture\Console\ConsoleApplicationFactory;
+use GetBible\Scripture\DependencyInjection\ContainerFactory;
+
+$autoload = $_composer_autoload_path ?? dirname(__DIR__) . '/vendor/autoload.php';
+
+if (!is_string($autoload) || !is_file($autoload)) {
+    fwrite(STDERR, "Composer autoload.php was not found. Install package dependencies first.\n");
+    exit(2);
+}
+
+require $autoload;
+
+$application = ConsoleApplicationFactory::create(ContainerFactory::create());
+$application->execute();

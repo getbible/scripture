@@ -75,9 +75,7 @@ gbs_remove_module_v2
 The PHP extension should expose a separate installer/manager object rather than
 adding network side effects to `GetBible\Sword\Engine`.
 
-## Public lifecycle target
-
-After the native boundary is available:
+## Public lifecycle
 
 ```php
 $scripture->initialize(); // explicit install of configured Bible modules
@@ -85,4 +83,10 @@ $scripture->refresh();    // explicit remote sync + atomic update
 $scripture->refreshIfDue();
 ```
 
-The default interval will remain `P1M`, overridable through configuration.
+These methods are implemented by `MaintenanceServiceInterface`. Under ABI v1,
+initialization warms installed modules and reports missing modules precisely.
+Remote mutation occurs only when configuration explicitly enables it and the
+injected backend advertises the matching capability.
+
+The default interval is `P1M`, overridable through configuration. Durable
+last-success state ensures a failure never postpones the next retry.

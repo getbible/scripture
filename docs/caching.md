@@ -41,11 +41,12 @@ Instantiation does not start a background process. Reliable execution belongs
 to an external scheduler:
 
 ```php
-$scripture->refreshTranslation('KJV');
+$scripture->refreshIfDue();
 ```
 
-Joomla CMS integrations should call the refresh service from Scheduled Tasks.
-CLI applications can call it from cron or a systemd timer.
+Joomla CMS integrations can inject `ScheduledRefreshHandler`. CLI applications
+can run `scripture:refresh --if-due` from cron or a systemd timer. See
+[production operations](operations.md).
 
 ## Cleanup
 

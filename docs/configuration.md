@@ -78,3 +78,35 @@ A positive integer number of seconds, default `30`. Native extraction uses a
 shared application lock and provisioning uses the matching exclusive lock. A
 bounded timeout prevents PHP workers from waiting indefinitely behind a failed
 or overloaded maintenance process.
+
+### `modules`
+
+Environment: `GETBIBLE_SCRIPTURE_MODULES`
+
+An explicit PHP list or comma-separated environment value containing exact
+translation module identifiers. Maintenance CLI options override this list for
+one run. An empty list means every currently installed Bible translation.
+
+### `provisioning_enabled`
+
+Environment: `GETBIBLE_SCRIPTURE_PROVISIONING_ENABLED`
+
+Defaults to false. When false, initialization and refresh may read installed
+modules and rebuild snapshots but cannot mutate the SWORD root. When true, the
+injected backend must still advertise each requested capability.
+
+### `install_all`
+
+Environment: `GETBIBLE_SCRIPTURE_INSTALL_ALL`
+
+Defaults to false. Enabling it makes parameterless `initialize()` request every
+policy-approved translation. Configuration rejects this setting unless
+`provisioning_enabled` is also true.
+
+## Durable maintenance state
+
+Maintenance state is stored at `<cache_path>/maintenance/state.json` through a
+synchronized temporary file and atomic rename. It records the last attempt,
+complete success, failure, error summary, and consecutive failure count.
+
+`refreshIfDue()` advances its interval only after a completely successful run.

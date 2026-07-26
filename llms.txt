@@ -29,3 +29,6 @@ Important rules:
 - raw annotation markup is untrusted and lexically segmented, not interpreted;
 - ABI v1 cannot install or update modules;
 - constructors must not perform network operations.
+- scheduled work must enter through MaintenanceServiceInterface;
+- only a completely successful maintenance run advances last_success_at;
+- remote module mutation requires both runtime policy and backend capability.

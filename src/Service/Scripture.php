@@ -13,6 +13,9 @@ use GetBible\Scripture\Provisioning\ProvisioningCapabilities;
 use GetBible\Scripture\Provisioning\ProvisioningCoordinatorInterface;
 use GetBible\Scripture\Provisioning\ProvisioningResult;
 use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
+use GetBible\Scripture\Maintenance\MaintenanceResult;
+use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
+use GetBible\Scripture\Maintenance\MaintenanceStatus;
 
 /**
  * Default dependency-injected implementation of the Bible application API.
@@ -35,6 +38,7 @@ final class Scripture implements ScriptureInterface
      * @param ModuleCatalogInterface $catalog Installed module catalog.
      * @param SnapshotManagerInterface $snapshots Snapshot lifecycle.
      * @param ProvisioningCoordinatorInterface $provisioning Module lifecycle.
+     * @param MaintenanceServiceInterface $maintenance Automated maintenance lifecycle.
      *
      * @since 0.1.0
      */
@@ -42,7 +46,71 @@ final class Scripture implements ScriptureInterface
         private ModuleCatalogInterface $catalog,
         private SnapshotManagerInterface $snapshots,
         private ProvisioningCoordinatorInterface $provisioning,
+        private MaintenanceServiceInterface $maintenance,
     ) {
+    }
+
+    /**
+     * Installs missing configured modules when supported and warms snapshots.
+     *
+     * @param list<string> $modules Explicit module targets or configuration defaults.
+     * @param bool $all Whether every policy-approved translation should be installed.
+     *
+     * @return MaintenanceResult
+     * @since 0.3.0
+     */
+    public function initialize(array $modules = [], bool $all = false): MaintenanceResult
+    {
+        $result = $this->maintenance->initialize($modules, $all);
+        $this->translations = [];
+
+        return $result;
+    }
+
+    /**
+     * Refreshes remote modules when enabled and rebuilds snapshots.
+     *
+     * @param list<string> $modules Explicit module targets or configuration defaults.
+     *
+     * @return MaintenanceResult
+     * @since 0.3.0
+     */
+    public function refresh(array $modules = []): MaintenanceResult
+    {
+        $result = $this->maintenance->refresh($modules);
+        $this->translations = [];
+
+        return $result;
+    }
+
+    /**
+     * Refreshes only after the configured durable interval has elapsed.
+     *
+     * @param list<string> $modules Explicit module targets or configuration defaults.
+     *
+     * @return MaintenanceResult
+     * @since 0.3.0
+     */
+    public function refreshIfDue(array $modules = []): MaintenanceResult
+    {
+        $result = $this->maintenance->refreshIfDue($modules);
+
+        if ($result->due()) {
+            $this->translations = [];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Returns current maintenance and native capability status.
+     *
+     * @return MaintenanceStatus
+     * @since 0.3.0
+     */
+    public function maintenanceStatus(): MaintenanceStatus
+    {
+        return $this->maintenance->status();
     }
 
     /**

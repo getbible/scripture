@@ -194,11 +194,11 @@ final class TranslationSnapshotManagerTest extends TestCase
         };
 
         $configuration = Configuration::fromEnvironment([
-                'module_path' => '/test/modules',
-                'cache_path' => $this->cachePath,
-                'refresh_interval' => 'P1M',
-                'auto_refresh' => true,
-            ]);
+            'module_path' => '/test/modules',
+            'cache_path' => $this->cachePath,
+            'refresh_interval' => 'P1M',
+            'auto_refresh' => true,
+        ]);
         $manager = new TranslationSnapshotManager(
             $configuration,
             $clock,

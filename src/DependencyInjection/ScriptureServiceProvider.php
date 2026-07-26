@@ -17,6 +17,13 @@ use GetBible\Scripture\Infrastructure\Sword\ModuleExtractorInterface;
 use GetBible\Scripture\Infrastructure\Sword\SwordEngineAdapter;
 use GetBible\Scripture\Infrastructure\Lock\FileModuleRootLock;
 use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
+use GetBible\Scripture\Infrastructure\Lock\FileMaintenanceLock;
+use GetBible\Scripture\Infrastructure\Lock\MaintenanceLockInterface;
+use GetBible\Scripture\Maintenance\JsonMaintenanceStateStore;
+use GetBible\Scripture\Maintenance\MaintenanceService;
+use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
+use GetBible\Scripture\Maintenance\MaintenanceStateStoreInterface;
+use GetBible\Scripture\Integration\Joomla\ScheduledRefreshHandler;
 use GetBible\Scripture\Provisioning\AbiV1ModuleProvisioner;
 use GetBible\Scripture\Provisioning\ModuleProvisionerInterface;
 use GetBible\Scripture\Provisioning\ProvisioningCoordinator;
@@ -87,6 +94,20 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
             true,
         );
         $container->share(
+            MaintenanceLockInterface::class,
+            static fn (Container $container): MaintenanceLockInterface => new FileMaintenanceLock(
+                $container->get(Configuration::class),
+            ),
+            true,
+        );
+        $container->share(
+            MaintenanceStateStoreInterface::class,
+            static fn (Container $container): MaintenanceStateStoreInterface => new JsonMaintenanceStateStore(
+                $container->get(Configuration::class),
+            ),
+            true,
+        );
+        $container->share(
             ModuleCatalogInterface::class,
             static fn (Container $container): ModuleCatalogInterface => new ModuleCatalog(
                 $container->get(ModuleExtractorInterface::class),
@@ -124,11 +145,33 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
             true,
         );
         $container->share(
+            MaintenanceServiceInterface::class,
+            static fn (Container $container): MaintenanceServiceInterface => new MaintenanceService(
+                $container->get(Configuration::class),
+                $container->get(ClockInterface::class),
+                $container->get(ModuleCatalogInterface::class),
+                $container->get(SnapshotManagerInterface::class),
+                $container->get(ProvisioningCoordinatorInterface::class),
+                $container->get(MaintenanceStateStoreInterface::class),
+                $container->get(MaintenanceLockInterface::class),
+                $container->get(DispatcherInterface::class),
+            ),
+            true,
+        );
+        $container->share(
+            ScheduledRefreshHandler::class,
+            static fn (Container $container): ScheduledRefreshHandler => new ScheduledRefreshHandler(
+                $container->get(MaintenanceServiceInterface::class),
+            ),
+            true,
+        );
+        $container->share(
             ScriptureInterface::class,
             static fn (Container $container): ScriptureInterface => new Scripture(
                 $container->get(ModuleCatalogInterface::class),
                 $container->get(SnapshotManagerInterface::class),
                 $container->get(ProvisioningCoordinatorInterface::class),
+                $container->get(MaintenanceServiceInterface::class),
             ),
             true,
         );

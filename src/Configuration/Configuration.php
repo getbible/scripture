@@ -52,7 +52,7 @@ final class Configuration
     /**
      * Creates configuration from explicit values, environment, and defaults.
      *
-     * @param array<string, bool|int|string|null> $values Explicit configuration.
+     * @param array<string, bool|int|string|list<string>|null> $values Explicit configuration.
      *
      * @return self
      * @since 0.1.0
@@ -82,6 +82,17 @@ final class Configuration
             self::DEFAULT_LOCK_TIMEOUT,
             'lock timeout',
         );
+        $modules = self::moduleList(
+            $values['modules'] ?? self::environment('GETBIBLE_SCRIPTURE_MODULES'),
+        );
+        $provisioningEnabled = self::booleanValue(
+            $values['provisioning_enabled'] ?? self::environment('GETBIBLE_SCRIPTURE_PROVISIONING_ENABLED'),
+            false,
+        );
+        $installAll = self::booleanValue(
+            $values['install_all'] ?? self::environment('GETBIBLE_SCRIPTURE_INSTALL_ALL'),
+            false,
+        );
 
         if ($cachePath === null) {
             throw new \InvalidArgumentException('A non-empty Scripture cache path is required.');
@@ -92,12 +103,24 @@ final class Configuration
         }
 
         try {
-            new \DateInterval($refreshInterval);
+            $interval = new \DateInterval($refreshInterval);
         } catch (\Exception $exception) {
             throw new \InvalidArgumentException(
                 sprintf('Invalid ISO-8601 refresh interval "%s".', $refreshInterval),
                 0,
                 $exception,
+            );
+        }
+
+        $epoch = new \DateTimeImmutable('@0');
+
+        if ($interval->invert === 1 || $epoch->add($interval) <= $epoch) {
+            throw new \InvalidArgumentException('The refresh interval must advance time.');
+        }
+
+        if ($installAll && !$provisioningEnabled) {
+            throw new \InvalidArgumentException(
+                'All-module installation requires explicit provisioning_enabled configuration.',
             );
         }
 
@@ -107,6 +130,9 @@ final class Configuration
             'refresh_interval' => $refreshInterval,
             'auto_refresh' => $autoRefresh,
             'lock_timeout' => $lockTimeout,
+            'modules' => $modules,
+            'provisioning_enabled' => $provisioningEnabled,
+            'install_all' => $installAll,
         ]));
     }
 
@@ -179,6 +205,66 @@ final class Configuration
     }
 
     /**
+     * Returns explicitly configured translation module identifiers.
+     *
+     * @return list<string>
+     * @since 0.3.0
+     */
+    public function modules(): array
+    {
+        $modules = $this->registry->get('modules', []);
+
+        if (!is_array($modules)) {
+            throw new \LogicException('Normalized module configuration is not an array.');
+        }
+
+        $validated = [];
+
+        foreach ($modules as $module) {
+            if (!is_string($module)) {
+                throw new \LogicException('Normalized module configuration contains a non-string value.');
+            }
+
+            $validated[] = $module;
+        }
+
+        return $validated;
+    }
+
+    /**
+     * Reports whether maintenance may invoke mutating native provisioning.
+     *
+     * @return bool
+     * @since 0.3.0
+     */
+    public function provisioningEnabled(): bool
+    {
+        return (bool) $this->registry->get('provisioning_enabled');
+    }
+
+    /**
+     * Reports whether initialization should install every approved translation.
+     *
+     * @return bool
+     * @since 0.3.0
+     */
+    public function installAll(): bool
+    {
+        return (bool) $this->registry->get('install_all');
+    }
+
+    /**
+     * Returns the durable maintenance state path.
+     *
+     * @return string
+     * @since 0.3.0
+     */
+    public function maintenanceStatePath(): string
+    {
+        return $this->cachePath() . '/maintenance/state.json';
+    }
+
+    /**
      * Returns a defensive copy of the underlying Joomla registry.
      *
      * @return Registry
@@ -192,12 +278,12 @@ final class Configuration
     /**
      * Returns the first non-empty scalar string.
      *
-     * @param bool|int|string|null ...$values Candidate values.
+     * @param bool|int|string|array<array-key, mixed>|null ...$values Candidate values.
      *
      * @return string|null
      * @since 0.1.0
      */
-    private static function firstString(bool|int|string|null ...$values): ?string
+    private static function firstString(bool|int|string|array|null ...$values): ?string
     {
         foreach ($values as $value) {
             if (is_string($value) && trim($value) !== '') {
@@ -226,13 +312,13 @@ final class Configuration
     /**
      * Parses a strict boolean configuration value.
      *
-     * @param bool|int|string|null $value Candidate value.
-     * @param bool             $default Default when no value is supplied.
+     * @param bool|int|string|array<array-key, mixed>|null $value Candidate value.
+     * @param bool $default Default when no value is supplied.
      *
      * @return bool
      * @since 0.1.0
      */
-    private static function booleanValue(bool|int|string|null $value, bool $default): bool
+    private static function booleanValue(bool|int|string|array|null $value, bool $default): bool
     {
         if ($value === null) {
             return $default;
@@ -240,6 +326,10 @@ final class Configuration
 
         if (is_bool($value)) {
             return $value;
+        }
+
+        if (is_array($value)) {
+            throw new \InvalidArgumentException('A boolean configuration value cannot be an array.');
         }
 
         if (is_int($value)) {
@@ -266,7 +356,7 @@ final class Configuration
     /**
      * Parses a strictly positive integer configuration value.
      *
-     * @param bool|int|string|null $value Candidate value.
+     * @param bool|int|string|array<array-key, mixed>|null $value Candidate value.
      * @param int $default Default when no value is supplied.
      * @param string $label Human-readable setting label.
      *
@@ -274,7 +364,7 @@ final class Configuration
      * @since 0.2.0
      */
     private static function positiveInteger(
-        bool|int|string|null $value,
+        bool|int|string|array|null $value,
         int $default,
         string $label,
     ): int {
@@ -282,7 +372,8 @@ final class Configuration
             return $default;
         }
 
-        if (is_bool($value)
+        if (is_array($value)
+            || is_bool($value)
             || (is_string($value) && preg_match('/^[1-9][0-9]*$/D', trim($value)) !== 1)
         ) {
             throw new \InvalidArgumentException(sprintf('Invalid %s value.', $label));
@@ -295,6 +386,46 @@ final class Configuration
         }
 
         return $integer;
+    }
+
+    /**
+     * Parses, validates, and de-duplicates configured module identifiers.
+     *
+     * @param bool|int|string|array<array-key, mixed>|null $value Candidate module configuration.
+     *
+     * @return list<string>
+     * @since 0.3.0
+     */
+    private static function moduleList(bool|int|string|array|null $value): array
+    {
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        if (is_bool($value) || is_int($value)) {
+            throw new \InvalidArgumentException('Configured modules must be an array or comma-separated string.');
+        }
+
+        $modules = is_string($value) ? explode(',', $value) : $value;
+        $normalized = [];
+
+        foreach ($modules as $module) {
+            if (!is_string($module)) {
+                throw new \InvalidArgumentException('Every configured module identifier must be a string.');
+            }
+
+            $module = trim($module);
+
+            if ($module === '' || str_contains($module, "\0")) {
+                throw new \InvalidArgumentException(
+                    'Configured module identifiers must be non-empty and contain no NUL bytes.',
+                );
+            }
+
+            $normalized[$module] = $module;
+        }
+
+        return array_values($normalized);
     }
 
     /**

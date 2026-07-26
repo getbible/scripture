@@ -28,6 +28,7 @@
         "ext-hash": "*",
         "ext-json": "*",
         "joomla/di": "^3.1.1 || ^4.0",
+        "joomla/console": "^3.0 || ^4.0",
         "joomla/event": "^3.0.2 || ^4.0",
         "joomla/filesystem": "^3.0 || ^4.0",
         "joomla/registry": "^3.0.2 || ^4.0"
@@ -50,15 +51,18 @@
             "GetBible\\Scripture\\Tests\\": "tests/"
         }
     },
+    "bin": [
+        "bin/getbible-scripture"
+    ],
     "scripts": {
         "check": [
-            "@validate",
+            "@package-validate",
             "@style",
             "@analyse",
             "@test"
         ],
-        "validate": "composer validate --strict",
-        "style": "phpcs -p",
+        "package-validate": "composer validate --strict",
+        "style": "phpcs -p --standard=ruleset.xml src tests",
         "analyse": "phpstan analyse --no-progress",
         "test": "phpunit"
     },
