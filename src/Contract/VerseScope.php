@@ -84,6 +84,16 @@ final class VerseScope
         $osis = self::requiredByteValue($scope['osis_reference'] ?? null, 'osis_reference');
         $versification = self::requiredByteValue($scope['versification'] ?? null, 'versification');
 
+        self::validateCoordinates(
+            $scope['testament'],
+            $scope['book'],
+            $scope['chapter'],
+            $scope['verse'],
+            $intro,
+            $bookAbbreviation,
+            $bookName,
+        );
+
         return new self(
             $scope['testament'],
             $scope['book'],
@@ -268,5 +278,54 @@ final class VerseScope
         }
 
         return self::requiredByteValue($value, $field);
+    }
+
+    /**
+     * Requires coordinates to agree with the producer's introduction scope.
+     *
+     * @param int $testament Testament position.
+     * @param int $book Book position.
+     * @param int $chapter Chapter position.
+     * @param int $verse Verse position.
+     * @param string $introductionScope Introduction classification.
+     * @param ByteValue|null $bookAbbreviation Optional book abbreviation.
+     * @param ByteValue|null $bookName Optional book name.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private static function validateCoordinates(
+        int $testament,
+        int $book,
+        int $chapter,
+        int $verse,
+        string $introductionScope,
+        ?ByteValue $bookAbbreviation,
+        ?ByteValue $bookName,
+    ): void {
+        $valid = match ($introductionScope) {
+            'module' => $testament === 0 && $book === 0 && $chapter === 0 && $verse === 0,
+            'testament' => $testament > 0 && $book === 0 && $chapter === 0 && $verse === 0,
+            'book' => $testament > 0 && $book > 0 && $chapter === 0 && $verse === 0,
+            'chapter' => $testament > 0 && $book > 0 && $chapter > 0 && $verse === 0,
+            'verse' => $testament > 0 && $book > 0 && $chapter > 0 && $verse > 0,
+            default => false,
+        };
+
+        if (!$valid) {
+            throw new ContractException('Verse scope coordinates do not agree with intro_scope.');
+        }
+
+        if (
+            $book > 0
+            && (
+                $bookAbbreviation === null
+                || $bookName === null
+                || $bookAbbreviation->bytes() === ''
+                || $bookName->bytes() === ''
+            )
+        ) {
+            throw new ContractException('A book-scoped verse key requires book name and abbreviation values.');
+        }
     }
 }

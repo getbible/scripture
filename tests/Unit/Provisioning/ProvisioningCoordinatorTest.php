@@ -8,6 +8,7 @@ namespace GetBible\Scripture\Tests\Unit\Provisioning;
 
 use GetBible\Scripture\Catalog\ModuleCatalogInterface;
 use GetBible\Scripture\Domain\TranslationMetadata;
+use GetBible\Scripture\Event\EventName;
 use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
 use GetBible\Scripture\Provisioning\ModuleProvisionerInterface;
 use GetBible\Scripture\Provisioning\ModuleProvisioningResult;
@@ -234,12 +235,20 @@ final class ProvisioningCoordinatorTest extends TestCase
             }
         };
 
+        $dispatcher = new Dispatcher();
+        $listenerCalls = 0;
+        $throwingListener = static function () use (&$listenerCalls): void {
+            ++$listenerCalls;
+            throw new \RuntimeException('An observer cannot change the provisioning outcome.');
+        };
+        $dispatcher->addListener(EventName::PROVISIONING_STARTED, $throwingListener);
+        $dispatcher->addListener(EventName::PROVISIONING_COMPLETED, $throwingListener);
         $coordinator = new ProvisioningCoordinator(
             $provisioner,
             $lock,
             $catalog,
             $snapshots,
-            new Dispatcher(),
+            $dispatcher,
         );
         $result = $coordinator->refresh([' KJV ', 'KJV', 'WEB']);
 
@@ -248,5 +257,6 @@ final class ProvisioningCoordinatorTest extends TestCase
         self::assertSame(1, $lock->writes);
         self::assertSame(1, $catalog->clears);
         self::assertSame(1, $snapshots->clears);
+        self::assertSame(2, $listenerCalls);
     }
 }

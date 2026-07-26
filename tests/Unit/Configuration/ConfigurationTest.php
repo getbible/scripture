@@ -75,4 +75,40 @@ final class ConfigurationTest extends TestCase
             'refresh_interval' => 'P0D',
         ]);
     }
+
+    /**
+     * Verifies deployment environment overrides persisted JSON only.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testEnvironmentOverridesPersistedButNotExplicitValues(): void
+    {
+        $previous = getenv('GETBIBLE_SCRIPTURE_CACHE_PATH');
+        putenv('GETBIBLE_SCRIPTURE_CACHE_PATH=/environment/cache');
+
+        try {
+            self::assertSame(
+                '/environment/cache',
+                Configuration::fromPersisted(['cache_path' => '/persisted/cache'])->cachePath(),
+            );
+            self::assertSame(
+                '/explicit/cache',
+                Configuration::fromEnvironment(['cache_path' => '/explicit/cache'])->cachePath(),
+            );
+            self::assertSame(
+                '/setup/cache',
+                Configuration::fromLayers(
+                    ['cache_path' => '/persisted/cache'],
+                    ['cache_path' => '/setup/cache'],
+                )->cachePath(),
+            );
+        } finally {
+            if (is_string($previous)) {
+                putenv('GETBIBLE_SCRIPTURE_CACHE_PATH=' . $previous);
+            } else {
+                putenv('GETBIBLE_SCRIPTURE_CACHE_PATH');
+            }
+        }
+    }
 }

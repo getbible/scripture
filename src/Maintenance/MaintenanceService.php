@@ -10,12 +10,13 @@ use GetBible\Scripture\Catalog\ModuleCatalogInterface;
 use GetBible\Scripture\Clock\ClockInterface;
 use GetBible\Scripture\Configuration\Configuration;
 use GetBible\Scripture\Event\EventName;
+use GetBible\Scripture\Event\LifecycleEventDispatcher;
 use GetBible\Scripture\Infrastructure\Lock\MaintenanceLockInterface;
+use GetBible\Scripture\Module\ModuleIdentifier;
 use GetBible\Scripture\Provisioning\ProvisioningCoordinatorInterface;
 use GetBible\Scripture\Provisioning\ProvisioningResult;
 use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
 use Joomla\Event\DispatcherInterface;
-use Joomla\Event\Event;
 
 /**
  * Default production maintenance orchestrator with per-module failure isolation.
@@ -454,32 +455,35 @@ final class MaintenanceService implements MaintenanceServiceInterface
     {
         $result = $this->lock->run(function () use ($operation, $callback): MaintenanceResult {
             $startedAt = $this->clock->now();
-            $this->dispatcher->dispatch(
+            LifecycleEventDispatcher::dispatch(
+                $this->dispatcher,
                 EventName::MAINTENANCE_STARTED,
-                new Event(EventName::MAINTENANCE_STARTED, [
+                [
                     'operation' => $operation,
                     'started_at' => $startedAt,
-                ]),
+                ],
             );
 
             try {
                 $result = $callback($startedAt);
-                $this->dispatcher->dispatch(
+                LifecycleEventDispatcher::dispatch(
+                    $this->dispatcher,
                     EventName::MAINTENANCE_COMPLETED,
-                    new Event(EventName::MAINTENANCE_COMPLETED, [
+                    [
                         'operation' => $operation,
                         'result' => $result,
-                    ]),
+                    ],
                 );
 
                 return $result;
             } catch (\Throwable $exception) {
-                $this->dispatcher->dispatch(
+                LifecycleEventDispatcher::dispatch(
+                    $this->dispatcher,
                     EventName::MAINTENANCE_FAILED,
-                    new Event(EventName::MAINTENANCE_FAILED, [
+                    [
                         'operation' => $operation,
                         'exception' => $exception,
-                    ]),
+                    ],
                 );
 
                 throw $exception;
@@ -500,12 +504,7 @@ final class MaintenanceService implements MaintenanceServiceInterface
         $installed = [];
 
         foreach ($this->catalog->translations() as $translation) {
-            $module = $translation->name()->bytes();
-
-            if ($module === '' || str_contains($module, "\0")) {
-                throw new \UnexpectedValueException('The native catalog returned an invalid module identifier.');
-            }
-
+            $module = ModuleIdentifier::normalize($translation->name()->bytes());
             $installed[$module] = true;
         }
 
@@ -529,14 +528,7 @@ final class MaintenanceService implements MaintenanceServiceInterface
                 throw new \InvalidArgumentException('Maintenance module identifiers must be strings.');
             }
 
-            $module = trim($module);
-
-            if ($module === '' || str_contains($module, "\0")) {
-                throw new \InvalidArgumentException(
-                    'Maintenance module identifiers must be non-empty and contain no NUL bytes.',
-                );
-            }
-
+            $module = ModuleIdentifier::normalize($module);
             $normalized[$module] = $module;
         }
 

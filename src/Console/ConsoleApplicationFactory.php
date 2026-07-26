@@ -7,7 +7,9 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Console;
 
 use GetBible\Scripture\DependencyInjection\ContainerService;
+use GetBible\Scripture\Exception\NativeEngineException;
 use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
+use GetBible\Scripture\Setup\SetupServiceInterface;
 use Joomla\Console\Application;
 use Joomla\DI\Container;
 use Joomla\Event\DispatcherInterface;
@@ -33,11 +35,19 @@ final class ConsoleApplicationFactory
         $application->setName('GetBible Scripture');
         $application->setVersion(self::version());
         $application->setDispatcher(ContainerService::get($container, DispatcherInterface::class));
-        $maintenance = ContainerService::get($container, MaintenanceServiceInterface::class);
+        $setup = ContainerService::get($container, SetupServiceInterface::class);
 
-        $application->addCommand(new InitializeCommand($maintenance));
-        $application->addCommand(new RefreshCommand($maintenance));
-        $application->addCommand(new StatusCommand($maintenance));
+        $application->addCommand(new DoctorCommand($setup));
+        $application->addCommand(new SetupCommand($setup));
+
+        try {
+            $maintenance = ContainerService::get($container, MaintenanceServiceInterface::class);
+            $application->addCommand(new InitializeCommand($maintenance));
+            $application->addCommand(new RefreshCommand($maintenance));
+            $application->addCommand(new StatusCommand($maintenance));
+        } catch (NativeEngineException) {
+            // Doctor and setup remain available to diagnose a missing native runtime.
+        }
 
         return $application;
     }

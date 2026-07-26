@@ -226,6 +226,59 @@ final class TranslationSnapshotManagerTest extends TestCase
 
         $manager->get('TestBible');
         self::assertSame(1, $extractor->calls);
+
+        $pointerPath = $this->cachePath . '/translations/TestBible/current.json';
+        $pointerJson = file_get_contents($pointerPath);
+        self::assertIsString($pointerJson);
+        $pointer = json_decode($pointerJson, true, 32, JSON_THROW_ON_ERROR);
+        self::assertIsArray($pointer);
+        $pointer['activated_at'] = '2026-07-27T12:00:00+00:00';
+        $pointer['expires_at'] = '2026-08-27T12:00:00+00:00';
+        self::assertNotFalse(file_put_contents(
+            $pointerPath,
+            json_encode($pointer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n",
+        ));
+        $reopened = $manager->get('TestBible');
+
+        self::assertSame('2026-07-27T12:00:00+00:00', $reopened->activatedAt()->format(DATE_ATOM));
+        self::assertSame(1, $extractor->calls);
+
+        $generationPath = $this->cachePath
+            . '/translations/TestBible/generations/'
+            . $reopened->generationId();
+        self::assertTrue(touch($generationPath, (new \DateTimeImmutable('2026-07-26T12:00:00+00:00'))->getTimestamp()));
+        self::assertNotFalse(file_put_contents($pointerPath, "{corrupt\n"));
+        $recovered = $manager->get('TestBible');
+
+        self::assertSame($reopened->generationId(), $recovered->generationId());
+        self::assertSame(1, $extractor->calls);
+        self::assertStringContainsString(
+            '"index_sha256"',
+            (string) file_get_contents($pointerPath),
+        );
+
+        $generation = $recovered->generationId();
+        unset($translation, $reopened, $recovered, $manager);
+        gc_collect_cycles();
+
+        $modulePath = $this->cachePath
+            . '/translations/TestBible/generations/'
+            . $generation
+            . '/module.ndjson';
+        self::assertNotFalse(file_put_contents($modulePath, 'tamper', FILE_APPEND));
+        $manager = new TranslationSnapshotManager(
+            $configuration,
+            $clock,
+            $catalog,
+            $extractor,
+            new ContractV1Validator(),
+            new Dispatcher(),
+            new FileModuleRootLock($configuration),
+        );
+        $repaired = new Translation('TestBible', $manager->get('TestBible'));
+
+        self::assertSame('Word', $repaired->book('John')->chapter(1)->verse(1)->stripped()?->requireUtf8());
+        self::assertSame(2, $extractor->calls);
     }
 
     /**

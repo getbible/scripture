@@ -16,6 +16,7 @@ use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
 use GetBible\Scripture\Maintenance\MaintenanceResult;
 use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
 use GetBible\Scripture\Maintenance\MaintenanceStatus;
+use GetBible\Scripture\Module\ModuleIdentifier;
 
 /**
  * Default dependency-injected implementation of the Bible application API.
@@ -24,6 +25,13 @@ use GetBible\Scripture\Maintenance\MaintenanceStatus;
  */
 final class Scripture implements ScriptureInterface
 {
+    /**
+     * Maximum process-local Translation objects retained by the facade.
+     *
+     * @since 1.0.0
+     */
+    private const TRANSLATION_CACHE_LIMIT = 32;
+
     /**
      * Process-local translation objects.
      *
@@ -134,7 +142,27 @@ final class Scripture implements ScriptureInterface
      */
     public function translation(string $module): Translation
     {
-        return $this->translations[$module] ??= new Translation($module, $this->snapshots->get($module));
+        $module = ModuleIdentifier::normalize($module);
+        $snapshot = $this->snapshots->get($module);
+        $translation = $this->translations[$module] ?? null;
+
+        if (
+            $translation === null
+            || $translation->generationId() !== $snapshot->generationId()
+            || $translation->activatedAt() != $snapshot->activatedAt()
+            || $translation->expiresAt() != $snapshot->expiresAt()
+        ) {
+            $translation = new Translation($module, $snapshot);
+        }
+
+        unset($this->translations[$module]);
+        $this->translations[$module] = $translation;
+
+        if (count($this->translations) > self::TRANSLATION_CACHE_LIMIT) {
+            array_shift($this->translations);
+        }
+
+        return $translation;
     }
 
     /**
@@ -191,8 +219,14 @@ final class Scripture implements ScriptureInterface
      */
     public function refreshTranslation(string $module): Translation
     {
+        $module = ModuleIdentifier::normalize($module);
         $translation = new Translation($module, $this->snapshots->refresh($module));
+        unset($this->translations[$module]);
         $this->translations[$module] = $translation;
+
+        if (count($this->translations) > self::TRANSLATION_CACHE_LIMIT) {
+            array_shift($this->translations);
+        }
 
         return $translation;
     }

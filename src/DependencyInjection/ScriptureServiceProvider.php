@@ -11,6 +11,10 @@ use GetBible\Scripture\Catalog\ModuleCatalogInterface;
 use GetBible\Scripture\Clock\ClockInterface;
 use GetBible\Scripture\Clock\SystemClock;
 use GetBible\Scripture\Configuration\Configuration;
+use GetBible\Scripture\Configuration\ConfigurationPath;
+use GetBible\Scripture\Configuration\ConfigurationRepositoryFactoryInterface;
+use GetBible\Scripture\Configuration\ConfigurationRepositoryInterface;
+use GetBible\Scripture\Configuration\JsonConfigurationRepositoryFactory;
 use GetBible\Scripture\Contract\ContractV1Validator;
 use GetBible\Scripture\Contract\ContractV1ValidatorInterface;
 use GetBible\Scripture\Infrastructure\Sword\ModuleExtractorInterface;
@@ -32,6 +36,12 @@ use GetBible\Scripture\Service\Scripture;
 use GetBible\Scripture\Service\ScriptureInterface;
 use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
 use GetBible\Scripture\Snapshot\TranslationSnapshotManager;
+use GetBible\Scripture\Setup\ApplicationWarmerInterface;
+use GetBible\Scripture\Setup\FreshContainerApplicationWarmer;
+use GetBible\Scripture\Setup\RuntimePrerequisiteInspector;
+use GetBible\Scripture\Setup\RuntimePrerequisiteInspectorInterface;
+use GetBible\Scripture\Setup\SetupService;
+use GetBible\Scripture\Setup\SetupServiceInterface;
 use Joomla\DI\Container;
 use Joomla\DI\ServiceProviderInterface;
 use Joomla\Event\Dispatcher;
@@ -75,6 +85,38 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
         }
 
         $container->share(
+            ConfigurationRepositoryFactoryInterface::class,
+            static fn (): ConfigurationRepositoryFactoryInterface => new JsonConfigurationRepositoryFactory(),
+            true,
+        );
+        $container->share(
+            ConfigurationRepositoryInterface::class,
+            static fn (Container $container): ConfigurationRepositoryInterface => ContainerService::get(
+                $container,
+                ConfigurationRepositoryFactoryInterface::class,
+            )->create(ConfigurationPath::resolve()),
+            true,
+        );
+        $container->share(
+            RuntimePrerequisiteInspectorInterface::class,
+            static fn (): RuntimePrerequisiteInspectorInterface => new RuntimePrerequisiteInspector(),
+            true,
+        );
+        $container->share(
+            ApplicationWarmerInterface::class,
+            static fn (): ApplicationWarmerInterface => new FreshContainerApplicationWarmer(),
+            true,
+        );
+        $container->share(
+            SetupServiceInterface::class,
+            static fn (Container $container): SetupServiceInterface => new SetupService(
+                ContainerService::get($container, ConfigurationRepositoryFactoryInterface::class),
+                ContainerService::get($container, RuntimePrerequisiteInspectorInterface::class),
+                ContainerService::get($container, ApplicationWarmerInterface::class),
+            ),
+            true,
+        );
+        $container->share(
             ModuleExtractorInterface::class,
             static fn (Container $container): ModuleExtractorInterface => new SwordEngineAdapter(
                 ContainerService::get($container, Configuration::class)->modulePath(),
@@ -112,6 +154,7 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
             static fn (Container $container): ModuleCatalogInterface => new ModuleCatalog(
                 ContainerService::get($container, ModuleExtractorInterface::class),
                 ContainerService::get($container, ContractV1ValidatorInterface::class),
+                ContainerService::get($container, ModuleRootLockInterface::class),
             ),
             true,
         );
@@ -176,5 +219,6 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
             true,
         );
         $container->alias(Scripture::class, ScriptureInterface::class);
+        $container->alias(SetupService::class, SetupServiceInterface::class);
     }
 }

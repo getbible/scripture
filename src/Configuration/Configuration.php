@@ -137,6 +137,45 @@ final class Configuration
     }
 
     /**
+     * Creates configuration with environment values overriding persisted JSON.
+     *
+     * This preserves {@see fromEnvironment()} for callers whose explicit values
+     * must remain authoritative while giving deployment environment variables
+     * precedence over application-owned persisted settings.
+     *
+     * @param array<string, bool|int|string|list<string>|null> $persisted Persisted settings.
+     *
+     * @return self
+     * @since 1.0.0
+     */
+    public static function fromPersisted(array $persisted): self
+    {
+        return self::fromEnvironment(array_replace($persisted, self::environmentValues()));
+    }
+
+    /**
+     * Creates configuration from explicit, environment, and persisted layers.
+     *
+     * Precedence is explicit setup values, deployment environment, persisted
+     * JSON, and defaults. Each layer is merged before normalization so a caller
+     * can override one setting without replacing unrelated persisted values.
+     *
+     * @param array<string, bool|int|string|list<string>|null> $persisted Persisted settings.
+     * @param array<string, bool|int|string|list<string>|null> $explicit Explicit overrides.
+     *
+     * @return self
+     * @since 1.0.0
+     */
+    public static function fromLayers(array $persisted, array $explicit = []): self
+    {
+        return self::fromEnvironment(array_replace(
+            $persisted,
+            self::environmentValues(),
+            $explicit,
+        ));
+    }
+
+    /**
      * Returns the explicit SWORD root or null for native resolution.
      *
      * @return string|null
@@ -343,6 +382,35 @@ final class Configuration
         $value = getenv($name);
 
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    /**
+     * Returns defined per-setting environment overrides.
+     *
+     * @return array<string, string>
+     * @since 1.0.0
+     */
+    private static function environmentValues(): array
+    {
+        $environment = [
+            'module_path' => self::environment('GETBIBLE_SCRIPTURE_MODULE_PATH'),
+            'cache_path' => self::environment('GETBIBLE_SCRIPTURE_CACHE_PATH'),
+            'refresh_interval' => self::environment('GETBIBLE_SCRIPTURE_REFRESH_INTERVAL'),
+            'auto_refresh' => self::environment('GETBIBLE_SCRIPTURE_AUTO_REFRESH'),
+            'lock_timeout' => self::environment('GETBIBLE_SCRIPTURE_LOCK_TIMEOUT'),
+            'modules' => self::environment('GETBIBLE_SCRIPTURE_MODULES'),
+            'provisioning_enabled' => self::environment('GETBIBLE_SCRIPTURE_PROVISIONING_ENABLED'),
+            'install_all' => self::environment('GETBIBLE_SCRIPTURE_INSTALL_ALL'),
+        ];
+        $defined = [];
+
+        foreach ($environment as $key => $value) {
+            if ($value !== null) {
+                $defined[$key] = $value;
+            }
+        }
+
+        return $defined;
     }
 
     /**

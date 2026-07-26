@@ -16,7 +16,7 @@ use GetBible\Scripture\Exception\ContractException;
 /**
  * Builds the compact random-access index while records are being validated.
  *
- * @phpstan-type RecordLocation array{offset: int, length: int}
+ * @phpstan-type RecordLocation array{offset: int, length: int, sha256: string}
  * @phpstan-type ChapterIndex array{
  *     number: int,
  *     introductions: list<RecordLocation>,
@@ -69,6 +69,14 @@ final class SnapshotRecordObserver implements RecordObserverInterface
     private array $introductions = [];
 
     /**
+     * Book lookup aliases keyed by ASCII-lowercased exact bytes.
+     *
+     * @var array<string, string>
+     * @since 1.0.0
+     */
+    private array $bookAliases = [];
+
+    /**
      * Observes a validated record and retains only query index data.
      *
      * @param array<string, mixed> $record Decoded record.
@@ -110,7 +118,20 @@ final class SnapshotRecordObserver implements RecordObserverInterface
         }
 
         $scope = VerseScope::fromArray($record['scope']);
-        $location = ['offset' => $offset, 'length' => $length];
+        try {
+            $canonical = json_encode(
+                $record,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+            );
+        } catch (\JsonException $exception) {
+            throw new ContractException('Unable to calculate the snapshot record digest.', 0, $exception);
+        }
+
+        $location = [
+            'offset' => $offset,
+            'length' => $length,
+            'sha256' => hash('sha256', $canonical),
+        ];
 
         if ($scope->book() === 0) {
             $this->introductions[] = $location;
@@ -128,6 +149,8 @@ final class SnapshotRecordObserver implements RecordObserverInterface
                 throw new ContractException('A scoped book entry is missing its name or abbreviation.');
             }
 
+            $this->registerBookAlias($bookKey, $name->bytes());
+            $this->registerBookAlias($bookKey, $abbreviation->bytes());
             $this->books[$bookKey] = [
                 'testament' => $scope->testament(),
                 'position' => $scope->book(),
@@ -137,6 +160,25 @@ final class SnapshotRecordObserver implements RecordObserverInterface
                 'introductions' => [],
                 'chapters' => [],
             ];
+        } else {
+            $book = $this->books[$bookKey];
+            $name = $scope->bookName();
+            $abbreviation = $scope->bookAbbreviation();
+
+            if (
+                $name === null
+                || $abbreviation === null
+                || $name->bytes() !== ByteValue::fromArray($book['name'], "books.$bookKey.name")->bytes()
+                || $abbreviation->bytes()
+                    !== ByteValue::fromArray($book['abbreviation'], "books.$bookKey.abbreviation")->bytes()
+                || $scope->versification()->bytes()
+                    !== ByteValue::fromArray($book['versification'], "books.$bookKey.versification")->bytes()
+            ) {
+                throw new ContractException(sprintf(
+                    'Book metadata changes within snapshot book "%s".',
+                    $bookKey,
+                ));
+            }
         }
 
         if ($scope->chapter() === 0) {
@@ -199,5 +241,31 @@ final class SnapshotRecordObserver implements RecordObserverInterface
             'introductions' => $this->introductions,
             'books' => $this->books,
         ];
+    }
+
+    /**
+     * Rejects aliases that would resolve ambiguously through Translation::book().
+     *
+     * @param string $bookKey Compound testament/book key.
+     * @param string $alias Exact book name or abbreviation bytes.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function registerBookAlias(string $bookKey, string $alias): void
+    {
+        $key = strtolower($alias);
+        $existing = $this->bookAliases[$key] ?? null;
+
+        if ($existing !== null && $existing !== $bookKey) {
+            throw new ContractException(sprintf(
+                'Book alias "%s" is ambiguous between "%s" and "%s".',
+                $alias,
+                $existing,
+                $bookKey,
+            ));
+        }
+
+        $this->bookAliases[$key] = $bookKey;
     }
 }
