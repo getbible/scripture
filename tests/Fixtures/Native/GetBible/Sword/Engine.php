@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Sword;
 
 use GetBible\Scripture\Contract\StructuredData;
+use GetBible\Scripture\Tests\Unit\Setup\NativeRuntimeState;
 
 /**
  * Deterministic in-process substitute for native-runtime unit tests.
@@ -15,22 +16,6 @@ use GetBible\Scripture\Contract\StructuredData;
  */
 final class Engine
 {
-    /**
-     * Extract fixture path.
-     *
-     * @var string
-     * @since 1.0.0
-     */
-    public static string $fixturePath = '';
-
-    /**
-     * Whether metadata access should fail.
-     *
-     * @var bool
-     * @since 1.0.0
-     */
-    public static bool $throwMetadata = false;
-
     /**
      * Creates a fake engine for a resolved module root.
      *
@@ -102,7 +87,7 @@ final class Engine
      */
     public function streamModules(mixed $destination): int
     {
-        $lines = file(self::$fixturePath);
+        $lines = file(NativeRuntimeState::$fixturePath);
 
         if (!is_array($lines)) {
             throw new \RuntimeException('Unable to read the fake native fixture.');
@@ -168,7 +153,7 @@ final class Engine
             throw new \InvalidArgumentException('Unexpected fake extraction request.');
         }
 
-        $contents = file_get_contents(self::$fixturePath);
+        $contents = file_get_contents(NativeRuntimeState::$fixturePath);
 
         if (!is_string($contents)) {
             throw new \RuntimeException('Unable to read the fake native fixture.');
@@ -185,7 +170,7 @@ final class Engine
      */
     private static function guardMetadata(): void
     {
-        if (self::$throwMetadata) {
+        if (NativeRuntimeState::$throwMetadata) {
             throw new \RuntimeException('native metadata failed');
         }
     }

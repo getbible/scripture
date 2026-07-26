@@ -32,6 +32,13 @@ final class SnapshotIndex
     private mixed $stream = null;
 
     /**
+     * Active generation reader lease, when construction completed.
+     *
+     * @since 1.0.0
+     */
+    private ?GenerationLease $lease = null;
+
+    /**
      * Creates a verified snapshot reader.
      *
      * @param string $generationPath Generation directory.
@@ -51,8 +58,9 @@ final class SnapshotIndex
         private \DateTimeImmutable $expiresAt,
         private string $generation,
         private string $indexSha256,
-        private GenerationLease $lease,
+        GenerationLease $lease,
     ) {
+        $this->lease = $lease;
     }
 
     /**
@@ -172,9 +180,7 @@ final class SnapshotIndex
             fclose($this->stream);
         }
 
-        if (isset($this->lease)) {
-            $this->lease->release();
-        }
+        $this->lease?->release();
     }
 
     /**

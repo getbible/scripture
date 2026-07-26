@@ -9,6 +9,7 @@ namespace GetBible\Scripture\Tests\Unit\Console;
 use GetBible\Scripture\Configuration\JsonConfigurationRepositoryFactory;
 use GetBible\Scripture\Console\DoctorCommand;
 use GetBible\Scripture\Console\SetupCommand;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Setup\SetupService;
 use Joomla\Console\Command\AbstractCommand;
 use PHPUnit\Framework\TestCase;
@@ -82,14 +83,20 @@ final class SetupCommandsTest extends TestCase
                 '--json' => true,
             ],
         );
-        $payload = json_decode($display, true, 32, JSON_THROW_ON_ERROR);
+        $payload = StructuredData::object(
+            json_decode($display, true, 32, JSON_THROW_ON_ERROR),
+            'Setup command response',
+        );
+        $configuration = StructuredData::object(
+            $payload['configuration'] ?? null,
+            'Setup command configuration',
+        );
 
         self::assertSame(0, $exitCode);
-        self::assertIsArray($payload);
         self::assertSame('setup', $payload['operation'] ?? null);
         self::assertTrue($payload['succeeded'] ?? false);
-        self::assertSame(['KJV', 'WEB'], $payload['configuration']['modules'] ?? null);
-        self::assertFalse($payload['configuration']['auto_refresh'] ?? true);
+        self::assertSame(['KJV', 'WEB'], $configuration['modules'] ?? null);
+        self::assertFalse($configuration['auto_refresh'] ?? true);
         self::assertFalse($payload['warm_requested'] ?? true);
         self::assertFileExists($path);
     }
@@ -121,13 +128,23 @@ final class SetupCommandsTest extends TestCase
                 '--json' => true,
             ],
         );
-        $payload = json_decode($display, true, 32, JSON_THROW_ON_ERROR);
+        $payload = StructuredData::object(
+            json_decode($display, true, 32, JSON_THROW_ON_ERROR),
+            'Doctor command response',
+        );
+        $runtime = StructuredData::object(
+            $payload['runtime'] ?? null,
+            'Doctor command runtime',
+        );
+        $configuration = StructuredData::object(
+            $payload['configuration'] ?? null,
+            'Doctor command configuration',
+        );
 
         self::assertSame(0, $exitCode);
-        self::assertIsArray($payload);
         self::assertSame('doctor', $payload['operation'] ?? null);
-        self::assertTrue($payload['runtime']['ready'] ?? false);
-        self::assertSame('/srv/scripture-cache', $payload['configuration']['cache_path'] ?? null);
+        self::assertTrue($runtime['ready'] ?? false);
+        self::assertSame('/srv/scripture-cache', $configuration['cache_path'] ?? null);
         self::assertSame($before, file_get_contents($path));
     }
 

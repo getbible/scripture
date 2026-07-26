@@ -8,6 +8,7 @@ namespace GetBible\Scripture\Tests\Unit\Console;
 
 use GetBible\Scripture\Configuration\Configuration;
 use GetBible\Scripture\Console\DoctorCommand;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Setup\RuntimePrerequisiteReport;
 use GetBible\Scripture\Setup\SetupServiceInterface;
 use PHPUnit\Framework\TestCase;
@@ -66,17 +67,18 @@ final class DoctorCommandDiagnosticsTest extends TestCase
         $output = new BufferedOutput();
 
         $exitCode = (new DoctorCommand($service))->execute($input, $output);
-        $payload = json_decode($output->fetch(), true, 32, JSON_THROW_ON_ERROR);
+        $payload = StructuredData::object(
+            json_decode($output->fetch(), true, 32, JSON_THROW_ON_ERROR),
+            'Doctor command response',
+        );
+        $errors = StructuredData::list($payload['errors'] ?? null, 'Doctor command errors');
 
         self::assertSame(1, $exitCode);
-        self::assertIsArray($payload);
         self::assertFalse($payload['succeeded'] ?? true);
         self::assertSame('relative.json', $payload['configuration_path'] ?? null);
         self::assertNull($payload['configuration'] ?? null);
-        self::assertStringContainsString(
-            'must be absolute',
-            (string) ($payload['errors'][0] ?? ''),
-        );
+        self::assertIsString($errors[0] ?? null);
+        self::assertStringContainsString('must be absolute', $errors[0]);
     }
 
     /**

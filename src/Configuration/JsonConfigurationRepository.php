@@ -21,22 +21,6 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
     private const FORMAT = 'getbible.scripture.configuration/v1';
 
     /**
-     * Allowed persisted configuration keys.
-     *
-     * @since 1.0.0
-     */
-    private const ALLOWED_KEYS = [
-        'module_path',
-        'cache_path',
-        'refresh_interval',
-        'auto_refresh',
-        'lock_timeout',
-        'modules',
-        'provisioning_enabled',
-        'install_all',
-    ];
-
-    /**
      * Creates a repository for an explicit path.
      *
      * @param string|null $path Absolute path, or null for non-persistent configuration.
@@ -127,18 +111,20 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
      */
     public function save(Configuration $configuration): void
     {
-        if ($this->path === null) {
+        $path = $this->path;
+
+        if ($path === null) {
             throw new \LogicException(
                 'A configuration path must be supplied explicitly or through '
                 . ConfigurationPath::ENVIRONMENT_VARIABLE . '.',
             );
         }
 
-        if (is_link($this->path)) {
+        if (is_link($path)) {
             throw new \RuntimeException('Refusing to replace a symbolic-link configuration path.');
         }
 
-        $directory = dirname($this->path);
+        $directory = dirname($path);
         $this->ensureDirectory($directory);
         $settings = $this->configurationSettings($configuration);
         $payload = json_encode(
@@ -179,11 +165,11 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
                 fclose($stream);
             }
 
-            if (!rename($temporary, $this->path)) {
+            if (!rename($temporary, $path)) {
                 throw new \RuntimeException('The Scripture configuration could not be activated atomically.');
             }
 
-            if (!chmod($this->path, 0600)) {
+            if (!chmod($path, 0600)) {
                 throw new \RuntimeException('Restrictive permissions could not be applied to configuration.');
             }
         } finally {
@@ -244,61 +230,87 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
      */
     private function validateSettings(array $settings): array
     {
+        /** @var array<string, bool|int|string|list<string>|null> $validated */
         $validated = [];
 
         foreach ($settings as $key => $value) {
-            if (!is_string($key) || !in_array($key, self::ALLOWED_KEYS, true)) {
+            if (!is_string($key)) {
                 throw new \UnexpectedValueException('The Scripture configuration contains an unknown setting.');
             }
 
-            if ($key === 'modules') {
-                if (!is_array($value) || !array_is_list($value)) {
-                    throw new \UnexpectedValueException(
-                        'The persisted Scripture setting "modules" must be a list of strings.',
-                    );
-                }
-
-                $items = [];
-
-                foreach ($value as $item) {
-                    if (!is_string($item)) {
+            switch ($key) {
+                case 'modules':
+                    if (!is_array($value) || !array_is_list($value)) {
                         throw new \UnexpectedValueException(
-                            'The persisted Scripture setting "modules" must contain only strings.',
+                            'The persisted Scripture setting "modules" must be a list of strings.',
                         );
                     }
 
-                    $items[] = $item;
-                }
+                    $items = [];
 
-                $validated[$key] = $items;
-                continue;
+                    foreach ($value as $item) {
+                        if (!is_string($item)) {
+                            throw new \UnexpectedValueException(
+                                'The persisted Scripture setting "modules" must contain only strings.',
+                            );
+                        }
+
+                        $items[] = $item;
+                    }
+
+                    $validated[$key] = $items;
+                    break;
+
+                case 'module_path':
+                    if ($value !== null && !is_string($value)) {
+                        throw new \UnexpectedValueException(
+                            'The persisted Scripture setting "module_path" must be a string or null.',
+                        );
+                    }
+
+                    $validated[$key] = $value;
+                    break;
+
+                case 'cache_path':
+                case 'refresh_interval':
+                    if (!is_string($value)) {
+                        throw new \UnexpectedValueException(sprintf(
+                            'The persisted Scripture setting "%s" must be a string.',
+                            $key,
+                        ));
+                    }
+
+                    $validated[$key] = $value;
+                    break;
+
+                case 'auto_refresh':
+                case 'provisioning_enabled':
+                case 'install_all':
+                    if (!is_bool($value)) {
+                        throw new \UnexpectedValueException(sprintf(
+                            'The persisted Scripture setting "%s" must be a boolean.',
+                            $key,
+                        ));
+                    }
+
+                    $validated[$key] = $value;
+                    break;
+
+                case 'lock_timeout':
+                    if (!is_int($value)) {
+                        throw new \UnexpectedValueException(
+                            'The persisted Scripture setting "lock_timeout" must be an integer.',
+                        );
+                    }
+
+                    $validated[$key] = $value;
+                    break;
+
+                default:
+                    throw new \UnexpectedValueException(
+                        'The Scripture configuration contains an unknown setting.',
+                    );
             }
-
-            $valid = match ($key) {
-                'module_path' => $value === null || is_string($value),
-                'cache_path', 'refresh_interval' => is_string($value),
-                'auto_refresh', 'provisioning_enabled', 'install_all' => is_bool($value),
-                'lock_timeout' => is_int($value),
-                default => false,
-            };
-
-            if (!$valid) {
-                $expected = match ($key) {
-                    'module_path' => 'a string or null',
-                    'cache_path', 'refresh_interval' => 'a string',
-                    'auto_refresh', 'provisioning_enabled', 'install_all' => 'a boolean',
-                    'lock_timeout' => 'an integer',
-                    default => 'a supported value',
-                };
-
-                throw new \UnexpectedValueException(sprintf(
-                    'The persisted Scripture setting "%s" must be %s.',
-                    $key,
-                    $expected,
-                ));
-            }
-
-            $validated[$key] = $value;
         }
 
         try {

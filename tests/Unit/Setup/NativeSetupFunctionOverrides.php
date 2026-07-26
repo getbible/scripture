@@ -49,7 +49,9 @@ function class_exists(string $class, bool $autoload = true): bool
  */
 function phpversion(?string $extension = null): string|false
 {
-    return $extension === 'getbiblesword'
-        ? NativeRuntimeState::$extensionVersion
-        : \phpversion($extension);
+    if ($extension === 'getbiblesword') {
+        return NativeRuntimeState::$extensionVersion;
+    }
+
+    return $extension === null ? \phpversion() : \phpversion($extension);
 }

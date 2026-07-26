@@ -67,7 +67,7 @@
         "style": "phpcs -p --standard=ruleset.xml src tests",
         "analyse": "phpstan analyse --no-progress",
         "coverage": "phpunit --coverage-clover build/coverage.xml --coverage-text",
-        "coverage-inventory": "php scripts/coverage-inventory.php build/coverage.xml 80 75",
+        "coverage-inventory": "php scripts/coverage-inventory.php build/coverage.xml 94 87",
         "test": "phpunit"
     },
     "config": {
