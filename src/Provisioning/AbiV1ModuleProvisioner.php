@@ -21,9 +21,22 @@ final class AbiV1ModuleProvisioner implements ModuleProvisionerInterface
      * @return bool
      * @since 0.1.0
      */
-    public function isAvailable(): bool
+    public function capabilities(): ProvisioningCapabilities
     {
-        return false;
+        return ProvisioningCapabilities::abiV1();
+    }
+
+    /**
+     * Rejects selected-module installation until a safe native API exists.
+     *
+     * @param list<string> $modules Exact module identifiers.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function installTranslations(array $modules): ProvisioningResult
+    {
+        throw $this->unavailable();
     }
 
     /**
@@ -43,7 +56,20 @@ final class AbiV1ModuleProvisioner implements ModuleProvisionerInterface
      * @return ProvisioningResult
      * @since 0.1.0
      */
-    public function refreshTranslations(): ProvisioningResult
+    public function refreshTranslations(array $modules = []): ProvisioningResult
+    {
+        throw $this->unavailable();
+    }
+
+    /**
+     * Rejects removal until a safe native API exists.
+     *
+     * @param string $module Exact module identifier.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function removeTranslation(string $module): ProvisioningResult
     {
         throw $this->unavailable();
     }

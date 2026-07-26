@@ -69,3 +69,12 @@ a replacement generation under the interprocess lock.
 
 For predictable maintenance windows, call `refreshTranslation()` from a Joomla
 Scheduled Task, cron command, or systemd timer.
+
+### `lock_timeout`
+
+Environment: `GETBIBLE_SCRIPTURE_LOCK_TIMEOUT`
+
+A positive integer number of seconds, default `30`. Native extraction uses a
+shared application lock and provisioning uses the matching exclusive lock. A
+bounded timeout prevents PHP workers from waiting indefinitely behind a failed
+or overloaded maintenance process.

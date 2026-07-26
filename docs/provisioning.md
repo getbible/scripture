@@ -14,8 +14,28 @@ local modules. It cannot:
 - query a single remote reference.
 
 GetBible Scripture does not disguise a direct archive download as equivalent
-native installation. `ModuleProvisionerInterface` is injectable, but the
-default ABI-v1 implementation reports the capability as unavailable.
+native installation. `ModuleProvisionerInterface` is injectable, and
+`ProvisioningCoordinatorInterface` provides the stable application boundary.
+The default ABI-v1 implementation reports exact unavailable capabilities.
+
+```php
+$capabilities = $scripture->provisioningCapabilities();
+
+if ($capabilities->canInstallSelected()) {
+    $result = $scripture->installTranslations(['KJV', 'WEB']);
+}
+```
+
+The public boundary supports selected and all-module installation, selected or
+all-installed refresh, and removal. Each completed backend operation returns
+ordered `ModuleProvisioningResult` objects with changed, skipped, or failed
+status. Partial failure is therefore never hidden in a single boolean.
+
+The library takes a bounded exclusive application lock around provisioning.
+Native extraction takes the matching shared lock. This prevents cooperating
+Scripture processes from reading the module root during mutation. The future
+native backend must still provide repository validation, staged installation,
+atomic activation, and rollback guarantees.
 
 ## Required production workflow
 

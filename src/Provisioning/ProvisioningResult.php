@@ -14,43 +14,65 @@ namespace GetBible\Scripture\Provisioning;
 final class ProvisioningResult
 {
     /**
-     * Installed module identifiers.
+     * Backend operation name.
      *
-     * @var list<string>
-     * @since 0.1.0
+     * @var string
+     * @since 0.2.0
      */
-    private array $installed;
+    private string $operation;
 
     /**
-     * Updated module identifiers.
+     * Per-module outcomes.
      *
-     * @var list<string>
-     * @since 0.1.0
+     * @var list<ModuleProvisioningResult>
+     * @since 0.2.0
      */
-    private array $updated;
+    private array $modules;
 
     /**
-     * Skipped module identifiers.
+     * Creates a complete provisioning result.
      *
-     * @var list<string>
-     * @since 0.1.0
+     * @param string $operation Backend operation name.
+     * @param list<ModuleProvisioningResult> $modules Per-module outcomes.
+     *
+     * @since 0.2.0
      */
-    private array $skipped;
-
-    /**
-     * Creates a result from module identifier lists.
-     *
-     * @param list<string> $installed Installed modules.
-     * @param list<string> $updated Updated modules.
-     * @param list<string> $skipped Skipped modules.
-     *
-     * @since 0.1.0
-     */
-    public function __construct(array $installed, array $updated, array $skipped)
+    public function __construct(string $operation, array $modules)
     {
-        $this->installed = array_values($installed);
-        $this->updated = array_values($updated);
-        $this->skipped = array_values($skipped);
+        if (trim($operation) === '') {
+            throw new \InvalidArgumentException('A provisioning operation name is required.');
+        }
+
+        foreach ($modules as $module) {
+            if (!$module instanceof ModuleProvisioningResult) {
+                throw new \InvalidArgumentException('Provisioning results must contain module outcomes.');
+            }
+        }
+
+        $this->operation = $operation;
+        $this->modules = array_values($modules);
+    }
+
+    /**
+     * Returns the backend operation name.
+     *
+     * @return string
+     * @since 0.2.0
+     */
+    public function operation(): string
+    {
+        return $this->operation;
+    }
+
+    /**
+     * Returns every per-module outcome in backend order.
+     *
+     * @return list<ModuleProvisioningResult>
+     * @since 0.2.0
+     */
+    public function modules(): array
+    {
+        return $this->modules;
     }
 
     /**
@@ -61,7 +83,7 @@ final class ProvisioningResult
      */
     public function installed(): array
     {
-        return $this->installed;
+        return $this->matching(ModuleProvisioningResult::ACTION_INSTALL, ModuleProvisioningResult::STATUS_CHANGED);
     }
 
     /**
@@ -72,7 +94,7 @@ final class ProvisioningResult
      */
     public function updated(): array
     {
-        return $this->updated;
+        return $this->matching(ModuleProvisioningResult::ACTION_REFRESH, ModuleProvisioningResult::STATUS_CHANGED);
     }
 
     /**
@@ -83,6 +105,118 @@ final class ProvisioningResult
      */
     public function skipped(): array
     {
-        return $this->skipped;
+        $modules = [];
+
+        foreach ($this->modules as $module) {
+            if ($module->status() === ModuleProvisioningResult::STATUS_SKIPPED) {
+                $modules[] = $module->module();
+            }
+        }
+
+        return $modules;
+    }
+
+    /**
+     * Returns removed module identifiers.
+     *
+     * @return list<string>
+     * @since 0.2.0
+     */
+    public function removed(): array
+    {
+        return $this->matching(ModuleProvisioningResult::ACTION_REMOVE, ModuleProvisioningResult::STATUS_CHANGED);
+    }
+
+    /**
+     * Returns failed module identifiers.
+     *
+     * @return list<string>
+     * @since 0.2.0
+     */
+    public function failed(): array
+    {
+        $modules = [];
+
+        foreach ($this->modules as $module) {
+            if ($module->failed()) {
+                $modules[] = $module->module();
+            }
+        }
+
+        return $modules;
+    }
+
+    /**
+     * Reports whether every module operation completed without failure.
+     *
+     * @return bool
+     * @since 0.2.0
+     */
+    public function succeeded(): bool
+    {
+        return $this->failed() === [];
+    }
+
+    /**
+     * Reports whether at least one module changed.
+     *
+     * @return bool
+     * @since 0.2.0
+     */
+    public function changed(): bool
+    {
+        foreach ($this->modules as $module) {
+            if ($module->status() === ModuleProvisioningResult::STATUS_CHANGED) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns a serialization-safe result map.
+     *
+     * @return array{
+     *     operation: string,
+     *     succeeded: bool,
+     *     changed: bool,
+     *     modules: list<array<string, mixed>>
+     * }
+     * @since 0.2.0
+     */
+    public function toArray(): array
+    {
+        return [
+            'operation' => $this->operation,
+            'succeeded' => $this->succeeded(),
+            'changed' => $this->changed(),
+            'modules' => array_map(
+                static fn (ModuleProvisioningResult $module): array => $module->toArray(),
+                $this->modules,
+            ),
+        ];
+    }
+
+    /**
+     * Returns module identifiers matching an action and status.
+     *
+     * @param string $action Action filter.
+     * @param string $status Status filter.
+     *
+     * @return list<string>
+     * @since 0.2.0
+     */
+    private function matching(string $action, string $status): array
+    {
+        $modules = [];
+
+        foreach ($this->modules as $module) {
+            if ($module->action() === $action && $module->status() === $status) {
+                $modules[] = $module->module();
+            }
+        }
+
+        return $modules;
     }
 }

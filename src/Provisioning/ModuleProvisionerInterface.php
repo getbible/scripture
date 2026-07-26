@@ -14,12 +14,22 @@ namespace GetBible\Scripture\Provisioning;
 interface ModuleProvisionerInterface
 {
     /**
-     * Reports whether the active native boundary supports provisioning.
+     * Returns exact backend capabilities.
      *
-     * @return bool
-     * @since 0.1.0
+     * @return ProvisioningCapabilities
+     * @since 0.2.0
      */
-    public function isAvailable(): bool;
+    public function capabilities(): ProvisioningCapabilities;
+
+    /**
+     * Installs selected policy-approved Bible translations.
+     *
+     * @param list<string> $modules Exact module identifiers.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function installTranslations(array $modules): ProvisioningResult;
 
     /**
      * Installs every policy-approved Bible translation into a staged root.
@@ -35,5 +45,15 @@ interface ModuleProvisionerInterface
      * @return ProvisioningResult
      * @since 0.1.0
      */
-    public function refreshTranslations(): ProvisioningResult;
+    public function refreshTranslations(array $modules = []): ProvisioningResult;
+
+    /**
+     * Removes one installed Bible translation.
+     *
+     * @param string $module Exact module identifier.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function removeTranslation(string $module): ProvisioningResult;
 }

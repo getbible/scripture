@@ -13,6 +13,7 @@ use GetBible\Scripture\Contract\ContractV1ValidatorInterface;
 use GetBible\Scripture\Event\EventName;
 use GetBible\Scripture\Exception\ContractException;
 use GetBible\Scripture\Infrastructure\Sword\ModuleExtractorInterface;
+use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
 use Joomla\Event\DispatcherInterface;
 use Joomla\Event\Event;
 use Joomla\Filesystem\Folder;
@@ -41,6 +42,7 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
      * @param ModuleExtractorInterface $extractor Native stream adapter.
      * @param ContractV1ValidatorInterface $validator Stream validator.
      * @param DispatcherInterface $dispatcher Joomla event dispatcher.
+     * @param ModuleRootLockInterface $moduleRootLock SWORD root reader/writer lock.
      *
      * @since 0.1.0
      */
@@ -51,6 +53,7 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
         private ModuleExtractorInterface $extractor,
         private ContractV1ValidatorInterface $validator,
         private DispatcherInterface $dispatcher,
+        private ModuleRootLockInterface $moduleRootLock,
     ) {
     }
 
@@ -217,7 +220,13 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
                 throw new \RuntimeException('Unable to create the staged native module stream.');
             }
 
-            $written = $this->extractor->streamModule($module, $stream);
+            $written = $this->moduleRootLock->read(
+                fn (): int => $this->extractor->streamModule($module, $stream),
+            );
+
+            if (!is_int($written) || $written < 0) {
+                throw new ContractException('Native module extraction returned an invalid byte count.');
+            }
 
             if (fflush($stream) === false) {
                 throw new \RuntimeException('Unable to flush the staged native module stream.');

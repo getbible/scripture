@@ -16,6 +16,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Lossless contract and Scripture domain objects.
 - Atomic, lazy translation snapshot generation.
 - Configurable monthly snapshot rotation and Joomla lifecycle events.
+- Explicit provisioning capability discovery.
+- Selected/all installation, refresh, and removal contracts.
+- Ordered per-module provisioning outcomes.
+- Bounded shared/exclusive module-root lifecycle locking.
+- Provisioning lifecycle events and atomic process-cache invalidation.
 
 ### Changed
 

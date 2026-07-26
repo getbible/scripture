@@ -10,6 +10,7 @@ use GetBible\Scripture\Domain\Translation;
 use GetBible\Scripture\Domain\TranslationMetadata;
 use GetBible\Scripture\Domain\Verse;
 use GetBible\Scripture\Provisioning\ProvisioningResult;
+use GetBible\Scripture\Provisioning\ProvisioningCapabilities;
 
 /**
  * Primary Bible-only application API.
@@ -95,6 +96,24 @@ interface ScriptureInterface
     public function canProvisionModules(): bool;
 
     /**
+     * Returns exact native provisioning capabilities.
+     *
+     * @return ProvisioningCapabilities
+     * @since 0.2.0
+     */
+    public function provisioningCapabilities(): ProvisioningCapabilities;
+
+    /**
+     * Installs selected policy-approved Bible modules when supported.
+     *
+     * @param list<string> $modules Exact module identifiers.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function installTranslations(array $modules): ProvisioningResult;
+
+    /**
      * Installs every policy-approved Bible module when supported.
      *
      * @return ProvisioningResult
@@ -109,4 +128,24 @@ interface ScriptureInterface
      * @since 0.1.0
      */
     public function refreshModules(): ProvisioningResult;
+
+    /**
+     * Refreshes selected remote module files when supported.
+     *
+     * @param list<string> $modules Exact module identifiers.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function refreshSelectedModules(array $modules): ProvisioningResult;
+
+    /**
+     * Removes one installed Bible module when supported.
+     *
+     * @param string $module Exact module identifier.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function removeTranslation(string $module): ProvisioningResult;
 }

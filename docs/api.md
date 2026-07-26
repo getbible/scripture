@@ -24,11 +24,22 @@ $translation = $scripture->translation('KJV');
 $verse = $scripture->verse('KJV', 'John', 3, 16);
 $range = $scripture->verses('KJV', 'John', 3, 16, 18);
 $scripture->refreshTranslation('KJV');
+$scripture->provisioningCapabilities();
+$scripture->installTranslations(['KJV', 'WEB']);
+$scripture->installAllTranslations();
+$scripture->refreshSelectedModules(['KJV']);
+$scripture->refreshModules();
+$scripture->removeTranslation('KJV');
 ```
 
 `translations()` lists installed Bible modules. `translation()` opens the
 current valid snapshot or performs one full warm-up. A forced refresh re-exports
 the installed module and activates a new generation only after validation.
+
+Provisioning methods are stable even when the injected native backend cannot
+perform them. Inspect `provisioningCapabilities()` first. The default
+getBibleSword ABI v1 adapter accurately reports every mutating capability as
+unavailable and throws `ProvisioningUnavailableException` when called.
 
 ## Translation
 
@@ -114,6 +125,9 @@ The default Joomla dispatcher emits:
 - `onGetBibleScriptureRefreshStarted`
 - `onGetBibleScriptureRefreshCompleted`
 - `onGetBibleScriptureRefreshFailed`
+- `onGetBibleScriptureProvisioningStarted`
+- `onGetBibleScriptureProvisioningCompleted`
+- `onGetBibleScriptureProvisioningFailed`
 
 Each event contains the module name and the relevant snapshot or exception.
 Listeners must not mutate an active generation.
