@@ -39,7 +39,7 @@ final class MaintenanceCommandsTest extends TestCase
         $maintenance->expects(self::once())
             ->method('initialize')
             ->with(['KJV', 'WEB'], true)
-            ->willReturn($this->result('initialize', MaintenanceModuleResult::STATUS_READY));
+            ->willReturn($this->maintenanceResult('initialize', MaintenanceModuleResult::STATUS_READY));
 
         [$exitCode, $payload] = $this->execute(new InitializeCommand($maintenance), [
             '--module' => ['KJV', 'WEB'],
@@ -61,7 +61,7 @@ final class MaintenanceCommandsTest extends TestCase
     {
         $maintenance = $this->createMock(MaintenanceServiceInterface::class);
         $maintenance->method('initialize')->willReturn(
-            $this->result('initialize', MaintenanceModuleResult::STATUS_FAILED),
+            $this->maintenanceResult('initialize', MaintenanceModuleResult::STATUS_FAILED),
         );
 
         [$exitCode, $payload] = $this->execute(new InitializeCommand($maintenance), []);
@@ -82,7 +82,7 @@ final class MaintenanceCommandsTest extends TestCase
         $maintenance->expects(self::once())
             ->method('refresh')
             ->with(['KJV'])
-            ->willReturn($this->result('refresh', MaintenanceModuleResult::STATUS_REFRESHED));
+            ->willReturn($this->maintenanceResult('refresh', MaintenanceModuleResult::STATUS_REFRESHED));
         $maintenance->expects(self::never())->method('refreshIfDue');
 
         [$exitCode, $payload] = $this->execute(new RefreshCommand($maintenance), [
@@ -106,7 +106,10 @@ final class MaintenanceCommandsTest extends TestCase
         $maintenance->expects(self::once())
             ->method('refreshIfDue')
             ->with(['WEB'])
-            ->willReturn($this->result('refresh-if-due', MaintenanceModuleResult::STATUS_SKIPPED));
+            ->willReturn($this->maintenanceResult(
+                'refresh-if-due',
+                MaintenanceModuleResult::STATUS_SKIPPED,
+            ));
 
         [$exitCode, $payload] = $this->execute(new RefreshCommand($maintenance), [
             '--module' => ['WEB'],
@@ -177,7 +180,7 @@ final class MaintenanceCommandsTest extends TestCase
      * @return MaintenanceResult
      * @since 1.0.0
      */
-    private function result(string $operation, string $status): MaintenanceResult
+    private function maintenanceResult(string $operation, string $status): MaintenanceResult
     {
         $time = new \DateTimeImmutable('2026-07-26T12:00:00+00:00');
 
