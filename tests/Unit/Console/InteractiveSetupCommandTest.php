@@ -45,6 +45,7 @@ final class InteractiveSetupCommandTest extends TestCase
             ->method('configuration')
             ->with($path)
             ->willReturn($current);
+        $service->method('inspect')->willReturn($runtime);
         $service->expects(self::once())
             ->method('apply')
             ->willReturnCallback(
@@ -83,8 +84,9 @@ final class InteractiveSetupCommandTest extends TestCase
         $output = new BufferedOutput();
 
         $exitCode = $command->execute($input, $output);
+        $display = $output->fetch();
 
-        self::assertSame(0, $exitCode);
+        self::assertSame(0, $exitCode, $display);
 
         if (!$captured instanceof SetupRequest) {
             self::fail('Interactive setup did not submit a setup request.');
@@ -99,7 +101,7 @@ final class InteractiveSetupCommandTest extends TestCase
             'modules' => 'KJV, WEB',
             'auto_refresh' => false,
         ], $captured->values());
-        self::assertStringContainsString('Scripture setup completed.', $output->fetch());
+        self::assertStringContainsString('Scripture setup completed.', $display);
     }
 
     /**

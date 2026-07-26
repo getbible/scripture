@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace GetBible\Scripture\Configuration;
 
+use GetBible\Scripture\Module\ModuleIdentifier;
 use Joomla\Registry\Registry;
 
 /**
@@ -519,13 +520,7 @@ final class Configuration
                 throw new \InvalidArgumentException('Every configured module identifier must be a string.');
             }
 
-            $module = trim($module);
-
-            if ($module === '' || str_contains($module, "\0")) {
-                throw new \InvalidArgumentException(
-                    'Configured module identifiers must be non-empty and contain no NUL bytes.',
-                );
-            }
+            $module = ModuleIdentifier::normalize($module);
 
             $normalized[$module] = $module;
         }

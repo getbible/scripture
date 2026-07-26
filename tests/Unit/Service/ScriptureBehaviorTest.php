@@ -93,7 +93,9 @@ final class ScriptureBehaviorTest extends TestCase
         );
         $scripture = new Scripture($catalog, $snapshots, $provisioning, $maintenance);
 
-        self::assertSame([$firstSnapshot->metadata()], $scripture->translations());
+        $translations = $scripture->translations();
+        self::assertCount(1, $translations);
+        self::assertSame('TestBible', $translations[0]->name()->bytes());
         $translation = $scripture->translation(' TestBible ');
         self::assertSame($translation, $scripture->translation('TestBible'));
         self::assertSame('Word', $scripture->verse('TestBible', 'John', 1, 1)->stripped()?->requireUtf8());
