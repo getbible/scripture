@@ -263,8 +263,10 @@ jobs:
           sword_root="$RUNNER_TEMP/getbiblesword/php_getbiblesword-${sword_version}"
           test -f "$sword_root/composer.json"
           test -f "$sword_root/vendor/getbiblesword/src/c_api.cpp"
-          php "$RUNNER_TEMP/pie.phar" repository:add path "$sword_root"
-          php "$RUNNER_TEMP/pie.phar" install \
+          sudo env COMPOSER_ALLOW_SUPERUSER=1 \
+            php "$RUNNER_TEMP/pie.phar" repository:add path "$sword_root"
+          sudo env COMPOSER_ALLOW_SUPERUSER=1 \
+            php "$RUNNER_TEMP/pie.phar" install \
             --no-cache \
             'getbible/sword:*@dev'
           php --ri getbiblesword

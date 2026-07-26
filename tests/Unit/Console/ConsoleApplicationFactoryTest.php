@@ -34,14 +34,13 @@ final class ConsoleApplicationFactoryTest extends TestCase
             'cache_path' => '/tmp/getbible-scripture-console-factory',
         ]));
         $application = ConsoleApplicationFactory::create($container);
-        $commands = $application->all();
 
         self::assertSame('GetBible Scripture', $application->getName());
         self::assertSame('1.0.0', $application->getVersion());
-        self::assertArrayHasKey('scripture:doctor', $commands);
-        self::assertArrayHasKey('scripture:setup', $commands);
-        self::assertArrayNotHasKey('scripture:initialize', $commands);
-        self::assertArrayNotHasKey('scripture:refresh', $commands);
-        self::assertArrayNotHasKey('scripture:status', $commands);
+        self::assertTrue($application->hasCommand('scripture:doctor'));
+        self::assertTrue($application->hasCommand('scripture:setup'));
+        self::assertFalse($application->hasCommand('scripture:initialize'));
+        self::assertFalse($application->hasCommand('scripture:refresh'));
+        self::assertFalse($application->hasCommand('scripture:status'));
     }
 }

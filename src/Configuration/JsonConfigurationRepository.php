@@ -301,7 +301,15 @@ final class JsonConfigurationRepository implements ConfigurationRepositoryInterf
             $validated[$key] = $value;
         }
 
-        Configuration::fromEnvironment($validated);
+        try {
+            Configuration::fromEnvironment($validated);
+        } catch (\InvalidArgumentException $exception) {
+            throw new \UnexpectedValueException(
+                'The persisted Scripture settings are invalid: ' . $exception->getMessage(),
+                0,
+                $exception,
+            );
+        }
 
         return $validated;
     }
