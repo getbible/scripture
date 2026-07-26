@@ -39,14 +39,22 @@ final class ProvisioningCoordinatorOperationsTest extends TestCase
         $provisioner->expects(self::once())
             ->method('installTranslations')
             ->with(['KJV'])
-            ->willReturn($this->result('install-selected', 'KJV', ModuleProvisioningResult::ACTION_INSTALL));
+            ->willReturn($this->provisioningResult(
+                'install-selected',
+                'KJV',
+                ModuleProvisioningResult::ACTION_INSTALL,
+            ));
         $provisioner->expects(self::once())
             ->method('installAllTranslations')
             ->willReturn(new ProvisioningResult('install-all', []));
         $provisioner->expects(self::once())
             ->method('removeTranslation')
             ->with('WEB')
-            ->willReturn($this->result('remove', 'WEB', ModuleProvisioningResult::ACTION_REMOVE));
+            ->willReturn($this->provisioningResult(
+                'remove',
+                'WEB',
+                ModuleProvisioningResult::ACTION_REMOVE,
+            ));
 
         $lock = $this->createMock(ModuleRootLockInterface::class);
         $lock->expects(self::exactly(3))
@@ -150,7 +158,11 @@ final class ProvisioningCoordinatorOperationsTest extends TestCase
      * @return ProvisioningResult
      * @since 1.0.0
      */
-    private function result(string $operation, string $module, string $action): ProvisioningResult
+    private function provisioningResult(
+        string $operation,
+        string $module,
+        string $action,
+    ): ProvisioningResult
     {
         return new ProvisioningResult($operation, [
             new ModuleProvisioningResult(
