@@ -16,9 +16,11 @@ in the low-level catalog but are not exposed as Scripture translations.
 
 ## Status
 
-The current branch is the Phase 0/1 foundation for the first `0.1.0` release.
-It supports installed SWORD modules and establishes the safe extension points
-for CrossWire provisioning and scheduled refresh. See the
+Phases 0–2 are implemented. Installed SWORD modules are production-readable,
+and the package exposes capability-driven provisioning contracts with bounded
+reader/writer locking and per-module outcomes. The current native ABI still
+reports remote mutation as unavailable until its additive provisioning API is
+released. See the
 [roadmap](docs/roadmap.md) and [provisioning boundary](docs/provisioning.md).
 
 ## Requirements
@@ -112,6 +114,7 @@ documented defaults:
 | `cache_path` | `GETBIBLE_SCRIPTURE_CACHE_PATH` | `$XDG_CACHE_HOME/getbible/scripture` |
 | `refresh_interval` | `GETBIBLE_SCRIPTURE_REFRESH_INTERVAL` | `P1M` |
 | `auto_refresh` | `GETBIBLE_SCRIPTURE_AUTO_REFRESH` | `true` |
+| `lock_timeout` | `GETBIBLE_SCRIPTURE_LOCK_TIMEOUT` | `30` seconds |
 
 See [configuration](docs/configuration.md) for operational details.
 

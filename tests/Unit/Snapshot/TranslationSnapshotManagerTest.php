@@ -13,6 +13,7 @@ use GetBible\Scripture\Contract\ContractV1Validator;
 use GetBible\Scripture\Domain\Translation;
 use GetBible\Scripture\Domain\TranslationMetadata;
 use GetBible\Scripture\Infrastructure\Sword\ModuleExtractorInterface;
+use GetBible\Scripture\Infrastructure\Lock\FileModuleRootLock;
 use GetBible\Scripture\Snapshot\TranslationSnapshotManager;
 use Joomla\Event\Dispatcher;
 use PHPUnit\Framework\TestCase;
@@ -192,18 +193,20 @@ final class TranslationSnapshotManagerTest extends TestCase
             }
         };
 
-        $manager = new TranslationSnapshotManager(
-            Configuration::fromEnvironment([
+        $configuration = Configuration::fromEnvironment([
                 'module_path' => '/test/modules',
                 'cache_path' => $this->cachePath,
                 'refresh_interval' => 'P1M',
                 'auto_refresh' => true,
-            ]),
+            ]);
+        $manager = new TranslationSnapshotManager(
+            $configuration,
             $clock,
             $catalog,
             $extractor,
             new ContractV1Validator(),
             new Dispatcher(),
+            new FileModuleRootLock($configuration),
         );
 
         $translation = new Translation('TestBible', $manager->get('TestBible'));

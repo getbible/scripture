@@ -84,8 +84,9 @@ Introductions are indexed separately and never represented as verse zero.
 ### Provisioning
 
 Native ABI v1 cannot install or update modules. `ModuleProvisionerInterface`
-exists so the eventual native provisioning implementation can be injected
-without changing the Scripture API. See [provisioning](provisioning.md).
+and `ProvisioningCoordinatorInterface` allow the eventual native provisioning
+implementation to be injected without changing the Scripture API. Capability
+discovery keeps ABI limitations explicit. See [provisioning](provisioning.md).
 
 ## SOLID application
 
@@ -105,12 +106,16 @@ without changing the Scripture API. See [provisioning](provisioning.md).
 Snapshot warming uses an interprocess `flock`. The active generation is checked
 again after acquiring the lock so only one process performs an extraction.
 
+Every native export also holds a bounded shared module-root lifecycle lock.
+Provisioning holds the matching exclusive lock, so cooperating application
+processes cannot replace module files while the native engine reads them.
+
 The native extension serializes SWORD access within one PHP process. Different
 processes remain independent.
 
-A future module provisioner must use a separate module-root read/write lock.
-Snapshot immutability alone does not make it safe to replace source SWORD files
-while the native engine reads them.
+A future native module provisioner must additionally enforce repository,
+staging, atomic-install, and rollback policy within its own boundary. Snapshot
+immutability does not make an in-place native install safe.
 
 ## Failure behavior
 

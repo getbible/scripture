@@ -9,7 +9,8 @@ namespace GetBible\Scripture\Service;
 use GetBible\Scripture\Catalog\ModuleCatalogInterface;
 use GetBible\Scripture\Domain\Translation;
 use GetBible\Scripture\Domain\Verse;
-use GetBible\Scripture\Provisioning\ModuleProvisionerInterface;
+use GetBible\Scripture\Provisioning\ProvisioningCapabilities;
+use GetBible\Scripture\Provisioning\ProvisioningCoordinatorInterface;
 use GetBible\Scripture\Provisioning\ProvisioningResult;
 use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
 
@@ -33,14 +34,14 @@ final class Scripture implements ScriptureInterface
      *
      * @param ModuleCatalogInterface $catalog Installed module catalog.
      * @param SnapshotManagerInterface $snapshots Snapshot lifecycle.
-     * @param ModuleProvisionerInterface $provisioner Module lifecycle.
+     * @param ProvisioningCoordinatorInterface $provisioning Module lifecycle.
      *
      * @since 0.1.0
      */
     public function __construct(
         private ModuleCatalogInterface $catalog,
         private SnapshotManagerInterface $snapshots,
-        private ModuleProvisionerInterface $provisioner,
+        private ProvisioningCoordinatorInterface $provisioning,
     ) {
     }
 
@@ -136,7 +137,34 @@ final class Scripture implements ScriptureInterface
      */
     public function canProvisionModules(): bool
     {
-        return $this->provisioner->isAvailable();
+        return $this->provisioning->capabilities()->isAvailable();
+    }
+
+    /**
+     * Returns exact native provisioning capabilities.
+     *
+     * @return ProvisioningCapabilities
+     * @since 0.2.0
+     */
+    public function provisioningCapabilities(): ProvisioningCapabilities
+    {
+        return $this->provisioning->capabilities();
+    }
+
+    /**
+     * Installs selected policy-approved translations when supported.
+     *
+     * @param list<string> $modules Exact module identifiers.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function installTranslations(array $modules): ProvisioningResult
+    {
+        $result = $this->provisioning->install($modules);
+        $this->translations = [];
+
+        return $result;
     }
 
     /**
@@ -147,9 +175,7 @@ final class Scripture implements ScriptureInterface
      */
     public function installAllTranslations(): ProvisioningResult
     {
-        $result = $this->provisioner->installAllTranslations();
-        $this->catalog->clear();
-        $this->snapshots->clear();
+        $result = $this->provisioning->installAll();
         $this->translations = [];
 
         return $result;
@@ -163,10 +189,40 @@ final class Scripture implements ScriptureInterface
      */
     public function refreshModules(): ProvisioningResult
     {
-        $result = $this->provisioner->refreshTranslations();
-        $this->catalog->clear();
-        $this->snapshots->clear();
+        $result = $this->provisioning->refresh();
         $this->translations = [];
+
+        return $result;
+    }
+
+    /**
+     * Refreshes selected remote module files when supported.
+     *
+     * @param list<string> $modules Exact module identifiers.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function refreshSelectedModules(array $modules): ProvisioningResult
+    {
+        $result = $this->provisioning->refresh($modules);
+        $this->translations = [];
+
+        return $result;
+    }
+
+    /**
+     * Removes one installed Bible translation when supported.
+     *
+     * @param string $module Exact module identifier.
+     *
+     * @return ProvisioningResult
+     * @since 0.2.0
+     */
+    public function removeTranslation(string $module): ProvisioningResult
+    {
+        $result = $this->provisioning->remove($module);
+        unset($this->translations[$module]);
 
         return $result;
     }

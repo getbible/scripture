@@ -23,6 +23,13 @@ final class Configuration
     public const DEFAULT_REFRESH_INTERVAL = 'P1M';
 
     /**
+     * Default maximum time spent waiting for an application lifecycle lock.
+     *
+     * @since 0.2.0
+     */
+    public const DEFAULT_LOCK_TIMEOUT = 30;
+
+    /**
      * Joomla registry containing normalized configuration values.
      *
      * @var Registry
@@ -45,7 +52,7 @@ final class Configuration
     /**
      * Creates configuration from explicit values, environment, and defaults.
      *
-     * @param array<string, bool|string|null> $values Explicit configuration.
+     * @param array<string, bool|int|string|null> $values Explicit configuration.
      *
      * @return self
      * @since 0.1.0
@@ -69,6 +76,11 @@ final class Configuration
         $autoRefresh = self::booleanValue(
             $values['auto_refresh'] ?? self::environment('GETBIBLE_SCRIPTURE_AUTO_REFRESH'),
             true,
+        );
+        $lockTimeout = self::positiveInteger(
+            $values['lock_timeout'] ?? self::environment('GETBIBLE_SCRIPTURE_LOCK_TIMEOUT'),
+            self::DEFAULT_LOCK_TIMEOUT,
+            'lock timeout',
         );
 
         if ($cachePath === null) {
@@ -94,6 +106,7 @@ final class Configuration
             'cache_path' => self::normalizePath($cachePath),
             'refresh_interval' => $refreshInterval,
             'auto_refresh' => $autoRefresh,
+            'lock_timeout' => $lockTimeout,
         ]));
     }
 
@@ -155,6 +168,17 @@ final class Configuration
     }
 
     /**
+     * Returns the maximum number of seconds spent waiting for a lifecycle lock.
+     *
+     * @return int
+     * @since 0.2.0
+     */
+    public function lockTimeout(): int
+    {
+        return (int) $this->registry->get('lock_timeout');
+    }
+
+    /**
      * Returns a defensive copy of the underlying Joomla registry.
      *
      * @return Registry
@@ -168,12 +192,12 @@ final class Configuration
     /**
      * Returns the first non-empty scalar string.
      *
-     * @param bool|string|null ...$values Candidate values.
+     * @param bool|int|string|null ...$values Candidate values.
      *
      * @return string|null
      * @since 0.1.0
      */
-    private static function firstString(bool|string|null ...$values): ?string
+    private static function firstString(bool|int|string|null ...$values): ?string
     {
         foreach ($values as $value) {
             if (is_string($value) && trim($value) !== '') {
@@ -202,13 +226,13 @@ final class Configuration
     /**
      * Parses a strict boolean configuration value.
      *
-     * @param bool|string|null $value Candidate value.
+     * @param bool|int|string|null $value Candidate value.
      * @param bool             $default Default when no value is supplied.
      *
      * @return bool
      * @since 0.1.0
      */
-    private static function booleanValue(bool|string|null $value, bool $default): bool
+    private static function booleanValue(bool|int|string|null $value, bool $default): bool
     {
         if ($value === null) {
             return $default;
@@ -216,6 +240,16 @@ final class Configuration
 
         if (is_bool($value)) {
             return $value;
+        }
+
+        if (is_int($value)) {
+            return match ($value) {
+                1 => true,
+                0 => false,
+                default => throw new \InvalidArgumentException(
+                    sprintf('Invalid boolean configuration value "%d".', $value),
+                ),
+            };
         }
 
         $normalized = strtolower(trim($value));
@@ -227,6 +261,40 @@ final class Configuration
                 sprintf('Invalid boolean configuration value "%s".', $value),
             ),
         };
+    }
+
+    /**
+     * Parses a strictly positive integer configuration value.
+     *
+     * @param bool|int|string|null $value Candidate value.
+     * @param int $default Default when no value is supplied.
+     * @param string $label Human-readable setting label.
+     *
+     * @return int
+     * @since 0.2.0
+     */
+    private static function positiveInteger(
+        bool|int|string|null $value,
+        int $default,
+        string $label,
+    ): int {
+        if ($value === null) {
+            return $default;
+        }
+
+        if (is_bool($value)
+            || (is_string($value) && preg_match('/^[1-9][0-9]*$/D', trim($value)) !== 1)
+        ) {
+            throw new \InvalidArgumentException(sprintf('Invalid %s value.', $label));
+        }
+
+        $integer = (int) $value;
+
+        if ($integer < 1) {
+            throw new \InvalidArgumentException(sprintf('The %s must be greater than zero.', $label));
+        }
+
+        return $integer;
     }
 
     /**

@@ -15,8 +15,12 @@ use GetBible\Scripture\Contract\ContractV1Validator;
 use GetBible\Scripture\Contract\ContractV1ValidatorInterface;
 use GetBible\Scripture\Infrastructure\Sword\ModuleExtractorInterface;
 use GetBible\Scripture\Infrastructure\Sword\SwordEngineAdapter;
+use GetBible\Scripture\Infrastructure\Lock\FileModuleRootLock;
+use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
 use GetBible\Scripture\Provisioning\AbiV1ModuleProvisioner;
 use GetBible\Scripture\Provisioning\ModuleProvisionerInterface;
+use GetBible\Scripture\Provisioning\ProvisioningCoordinator;
+use GetBible\Scripture\Provisioning\ProvisioningCoordinatorInterface;
 use GetBible\Scripture\Service\Scripture;
 use GetBible\Scripture\Service\ScriptureInterface;
 use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
@@ -76,6 +80,13 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
             true,
         );
         $container->share(
+            ModuleRootLockInterface::class,
+            static fn (Container $container): ModuleRootLockInterface => new FileModuleRootLock(
+                $container->get(Configuration::class),
+            ),
+            true,
+        );
+        $container->share(
             ModuleCatalogInterface::class,
             static fn (Container $container): ModuleCatalogInterface => new ModuleCatalog(
                 $container->get(ModuleExtractorInterface::class),
@@ -92,6 +103,7 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
                 $container->get(ModuleExtractorInterface::class),
                 $container->get(ContractV1ValidatorInterface::class),
                 $container->get(DispatcherInterface::class),
+                $container->get(ModuleRootLockInterface::class),
             ),
             true,
         );
@@ -101,11 +113,22 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
             true,
         );
         $container->share(
+            ProvisioningCoordinatorInterface::class,
+            static fn (Container $container): ProvisioningCoordinatorInterface => new ProvisioningCoordinator(
+                $container->get(ModuleProvisionerInterface::class),
+                $container->get(ModuleRootLockInterface::class),
+                $container->get(ModuleCatalogInterface::class),
+                $container->get(SnapshotManagerInterface::class),
+                $container->get(DispatcherInterface::class),
+            ),
+            true,
+        );
+        $container->share(
             ScriptureInterface::class,
             static fn (Container $container): ScriptureInterface => new Scripture(
                 $container->get(ModuleCatalogInterface::class),
                 $container->get(SnapshotManagerInterface::class),
-                $container->get(ModuleProvisionerInterface::class),
+                $container->get(ProvisioningCoordinatorInterface::class),
             ),
             true,
         );

@@ -56,6 +56,27 @@ final class EventName
     public const REFRESH_FAILED = 'onGetBibleScriptureRefreshFailed';
 
     /**
+     * Emitted before a native module provisioning operation starts.
+     *
+     * @since 0.2.0
+     */
+    public const PROVISIONING_STARTED = 'onGetBibleScriptureProvisioningStarted';
+
+    /**
+     * Emitted after a native module provisioning operation completes.
+     *
+     * @since 0.2.0
+     */
+    public const PROVISIONING_COMPLETED = 'onGetBibleScriptureProvisioningCompleted';
+
+    /**
+     * Emitted after a native module provisioning operation fails.
+     *
+     * @since 0.2.0
+     */
+    public const PROVISIONING_FAILED = 'onGetBibleScriptureProvisioningFailed';
+
+    /**
      * Prevents instantiation of this constants-only class.
      *
      * @since 0.1.0

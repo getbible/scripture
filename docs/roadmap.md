@@ -18,15 +18,20 @@
 - Deterministic unit fixtures and KJV integration evidence.
 - Packagist registration and first release.
 
-## Phase 2 — native provisioning
+## Phase 2 — production provisioning boundary (`0.2.0`)
 
-- Additive getBibleSword provisioning ABI.
-- Matching `getbible/sword` PHP installer object.
-- Repository, license, disclaimer, TLS, locking, staging, and rollback policy.
-- Explicit one/all-translation installation.
-- Module update and removal.
+- Explicit provisioning capability discovery.
+- Selected/all-translation installation, refresh, and removal contracts.
+- Per-module operation results and lifecycle events.
+- Bounded shared/exclusive application locking around native readers and writers.
+- Atomic catalog and snapshot invalidation after mutation.
+- Exact ABI v1 unavailable adapter instead of unsafe archive downloading.
 
-## Phase 3 — automated maintenance
+The matching additive getBibleSword provisioning ABI and `getbible/sword`
+installer object are external integration gates. Once released, their adapter
+can replace `AbiV1ModuleProvisioner` without changing the public Scripture API.
+
+## Phase 3 — automated maintenance (`0.3.0`)
 
 - `initialize()`, `refresh()`, and `refreshIfDue()` over the native provisioner.
 - CLI maintenance commands.
