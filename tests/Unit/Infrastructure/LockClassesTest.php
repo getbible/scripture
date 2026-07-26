@@ -149,21 +149,17 @@ final class LockClassesTest extends TestCase
     public function testBoundedLockReleasesAfterCallbackFailure(): void
     {
         $lock = new BoundedFileLock($this->directory . '/failure/lifecycle.lock', 1);
-        $caught = false;
 
         try {
             $lock->synchronized(
                 LOCK_EX,
-                static function (): void {
-                    throw new \RuntimeException('Expected callback failure.');
-                },
+                self::throwExpectedCallbackFailure(...),
             );
+            self::fail('The callback failure was not propagated.');
         } catch (\RuntimeException $exception) {
-            $caught = true;
             self::assertSame('Expected callback failure.', $exception->getMessage());
         }
 
-        self::assertTrue($caught, 'The callback failure was not propagated.');
         self::assertSame(
             'reacquired',
             $lock->synchronized(LOCK_EX, static fn (): string => 'reacquired'),
@@ -193,5 +189,16 @@ final class LockClassesTest extends TestCase
             flock($holder, LOCK_UN);
             fclose($holder);
         }
+    }
+
+    /**
+     * Throws the deterministic callback failure used by the lock-release test.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private static function throwExpectedCallbackFailure(): void
+    {
+        throw new \RuntimeException('Expected callback failure.');
     }
 }
