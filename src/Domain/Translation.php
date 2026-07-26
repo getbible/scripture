@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Domain;
 
 use GetBible\Scripture\Exception\ReferenceNotFoundException;
+use GetBible\Scripture\Module\ModuleIdentifier;
 use GetBible\Scripture\Snapshot\SnapshotIndex;
 
 /**
@@ -28,6 +29,13 @@ final class Translation
         private string $moduleName,
         private SnapshotIndex $snapshot,
     ) {
+        $this->moduleName = ModuleIdentifier::normalize($moduleName);
+
+        if ($snapshot->metadata()->name()->bytes() !== $this->moduleName) {
+            throw new \InvalidArgumentException(
+                'A Translation module identifier must match its snapshot metadata.',
+            );
+        }
     }
 
     /**
@@ -204,5 +212,16 @@ final class Translation
     public function expiresAt(): \DateTimeImmutable
     {
         return $this->snapshot->expiresAt();
+    }
+
+    /**
+     * Returns the immutable content-addressed snapshot generation identifier.
+     *
+     * @return string
+     * @since 1.0.0
+     */
+    public function generationId(): string
+    {
+        return $this->snapshot->generationId();
     }
 }

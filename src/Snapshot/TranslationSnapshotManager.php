@@ -11,11 +11,14 @@ use GetBible\Scripture\Clock\ClockInterface;
 use GetBible\Scripture\Configuration\Configuration;
 use GetBible\Scripture\Contract\ContractV1ValidatorInterface;
 use GetBible\Scripture\Event\EventName;
+use GetBible\Scripture\Event\LifecycleEventDispatcher;
 use GetBible\Scripture\Exception\ContractException;
+use GetBible\Scripture\Infrastructure\Lock\BoundedFileLock;
+use GetBible\Scripture\Infrastructure\Lock\GenerationLease;
 use GetBible\Scripture\Infrastructure\Sword\ModuleExtractorInterface;
 use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
+use GetBible\Scripture\Module\ModuleIdentifier;
 use Joomla\Event\DispatcherInterface;
-use Joomla\Event\Event;
 use Joomla\Filesystem\Folder;
 
 /**
@@ -25,6 +28,27 @@ use Joomla\Filesystem\Folder;
  */
 final class TranslationSnapshotManager implements SnapshotManagerInterface
 {
+    /**
+     * Number of unleased immutable generations retained per module.
+     *
+     * @since 1.0.0
+     */
+    private const RETAIN_GENERATIONS = 2;
+
+    /**
+     * Age after which interrupted staging and pointer files are scavenged.
+     *
+     * @since 1.0.0
+     */
+    private const STALE_TEMPORARY_SECONDS = 3600;
+
+    /**
+     * Maximum process-local open snapshot readers.
+     *
+     * @since 1.0.0
+     */
+    private const SNAPSHOT_CACHE_LIMIT = 32;
+
     /**
      * Process-local open snapshot objects by module.
      *
@@ -67,14 +91,14 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
      */
     public function get(string $module): SnapshotIndex
     {
-        $module = $this->validateModule($module);
-        $snapshot = $this->snapshots[$module] ?? $this->openCurrent($module);
+        $module = ModuleIdentifier::normalize($module);
+        $snapshot = $this->openCurrent($module, $this->snapshots[$module] ?? null);
 
         if (
             $snapshot !== null
             && (!$this->configuration->autoRefresh() || !$snapshot->isExpired($this->clock->now()))
         ) {
-            return $this->snapshots[$module] = $snapshot;
+            return $this->remember($module, $snapshot);
         }
 
         return $this->warm($module, false);
@@ -90,24 +114,27 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
      */
     public function refresh(string $module): SnapshotIndex
     {
-        $module = $this->validateModule($module);
-        $this->dispatcher->dispatch(
+        $module = ModuleIdentifier::normalize($module);
+        LifecycleEventDispatcher::dispatch(
+            $this->dispatcher,
             EventName::REFRESH_STARTED,
-            new Event(EventName::REFRESH_STARTED, ['module' => $module]),
+            ['module' => $module],
         );
 
         try {
             $snapshot = $this->warm($module, true);
-            $this->dispatcher->dispatch(
+            LifecycleEventDispatcher::dispatch(
+                $this->dispatcher,
                 EventName::REFRESH_COMPLETED,
-                new Event(EventName::REFRESH_COMPLETED, ['module' => $module, 'snapshot' => $snapshot]),
+                ['module' => $module, 'snapshot' => $snapshot],
             );
 
             return $snapshot;
         } catch (\Throwable $exception) {
-            $this->dispatcher->dispatch(
+            LifecycleEventDispatcher::dispatch(
+                $this->dispatcher,
                 EventName::REFRESH_FAILED,
-                new Event(EventName::REFRESH_FAILED, ['module' => $module, 'exception' => $exception]),
+                ['module' => $module, 'exception' => $exception],
             );
 
             throw $exception;
@@ -143,54 +170,67 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             throw new \RuntimeException(sprintf('Unable to create snapshot root "%s".', $moduleRoot));
         }
 
-        $lock = fopen($moduleRoot . '/warm.lock', 'c+b');
+        $lock = new BoundedFileLock(
+            $moduleRoot . '/warm.lock',
+            $this->configuration->lockTimeout(),
+        );
 
-        if (!is_resource($lock) || !flock($lock, LOCK_EX)) {
-            if (is_resource($lock)) {
-                fclose($lock);
-            }
+        return $lock->synchronized(LOCK_EX, function () use ($module, $moduleRoot, $force): SnapshotIndex {
+            $this->scavengeInterruptedWrites($moduleRoot);
 
-            throw new \RuntimeException(sprintf('Unable to acquire the "%s" snapshot lock.', $module));
-        }
-
-        try {
             if (!$force) {
-                $current = $this->openCurrent($module);
+                $current = $this->openCurrent($module, $this->snapshots[$module] ?? null);
 
                 if (
                     $current !== null
                     && (!$this->configuration->autoRefresh() || !$current->isExpired($this->clock->now()))
                 ) {
-                    return $this->snapshots[$module] = $current;
+                    return $this->remember($module, $current);
+                }
+
+                if ($current === null) {
+                    $recovered = $this->recoverGeneration($module, $moduleRoot);
+
+                    if (
+                        $recovered !== null
+                        && (
+                            !$this->configuration->autoRefresh()
+                            || !$recovered->isExpired($this->clock->now())
+                        )
+                    ) {
+                        $this->activate($moduleRoot, $recovered);
+
+                        return $this->remember($module, $recovered);
+                    }
                 }
             }
 
-            $this->dispatcher->dispatch(
+            LifecycleEventDispatcher::dispatch(
+                $this->dispatcher,
                 EventName::WARM_STARTED,
-                new Event(EventName::WARM_STARTED, ['module' => $module]),
+                ['module' => $module],
             );
 
             try {
                 $snapshot = $this->buildGeneration($module, $moduleRoot);
-                $this->snapshots[$module] = $snapshot;
-                $this->dispatcher->dispatch(
+                $this->remember($module, $snapshot);
+                LifecycleEventDispatcher::dispatch(
+                    $this->dispatcher,
                     EventName::WARM_COMPLETED,
-                    new Event(EventName::WARM_COMPLETED, ['module' => $module, 'snapshot' => $snapshot]),
+                    ['module' => $module, 'snapshot' => $snapshot],
                 );
 
                 return $snapshot;
             } catch (\Throwable $exception) {
-                $this->dispatcher->dispatch(
+                LifecycleEventDispatcher::dispatch(
+                    $this->dispatcher,
                     EventName::WARM_FAILED,
-                    new Event(EventName::WARM_FAILED, ['module' => $module, 'exception' => $exception]),
+                    ['module' => $module, 'exception' => $exception],
                 );
 
                 throw $exception;
             }
-        } finally {
-            flock($lock, LOCK_UN);
-            fclose($lock);
-        }
+        });
     }
 
     /**
@@ -261,10 +301,19 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             }
 
             $index = $observer->index($result->streamSha256(), $now);
+            $moduleSha256 = hash_file('sha256', $moduleFile);
+
+            if (!is_string($moduleSha256)) {
+                throw new \RuntimeException('Unable to hash the staged native module stream.');
+            }
+
+            $index['module_file_size'] = $written;
+            $index['module_file_sha256'] = $moduleSha256;
             $indexJson = json_encode(
                 $index,
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
             ) . "\n";
+            $indexSha256 = hash('sha256', $indexJson);
             $this->writeSynchronized($staging . '/index.json', $indexJson);
             fclose($stream);
             $stream = null;
@@ -273,30 +322,36 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             $destination = $moduleRoot . '/generations/' . $generation;
 
             if (is_dir($destination)) {
-                $snapshot = SnapshotIndex::open($destination, $now, $expires);
-                Folder::delete($staging);
+                try {
+                    $existingIndex = file_get_contents($destination . '/index.json');
+
+                    if (!is_string($existingIndex)) {
+                        throw new ContractException('Existing snapshot generation index is unreadable.');
+                    }
+
+                    $snapshot = SnapshotIndex::open(
+                        $destination,
+                        $now,
+                        $expires,
+                        hash('sha256', $existingIndex),
+                    );
+                    Folder::delete($staging);
+                } catch (ContractException) {
+                    $this->repairGeneration($moduleRoot, $generation, $staging, $destination);
+                    $snapshot = SnapshotIndex::open($destination, $now, $expires, $indexSha256);
+                }
             } elseif (!rename($staging, $destination)) {
                 throw new \RuntimeException('Unable to atomically commit the staged snapshot generation.');
             } else {
-                $snapshot = SnapshotIndex::open($destination, $now, $expires);
+                $snapshot = SnapshotIndex::open($destination, $now, $expires, $indexSha256);
             }
 
-            $pointer = [
-                'format' => 'getbible.scripture.current/v1',
-                'generation' => $generation,
-                'activated_at' => $now->format(DATE_ATOM),
-                'expires_at' => $expires->format(DATE_ATOM),
-            ];
-            $pointerJson = json_encode(
-                $pointer,
-                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
-            ) . "\n";
-            $pointerTemp = $moduleRoot . '/current.' . bin2hex(random_bytes(8)) . '.tmp';
-            $this->writeSynchronized($pointerTemp, $pointerJson);
+            $this->activate($moduleRoot, $snapshot);
 
-            if (!rename($pointerTemp, $moduleRoot . '/current.json')) {
-                @unlink($pointerTemp);
-                throw new \RuntimeException('Unable to atomically activate the snapshot generation.');
+            try {
+                $this->cleanupGenerations($moduleRoot, $generation);
+            } catch (\Throwable) {
+                // Cleanup is retried after a later activation and cannot invalidate this committed generation.
             }
 
             return $snapshot;
@@ -317,11 +372,12 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
      * Opens the active generation when its pointer is complete and valid.
      *
      * @param string $module Exact installed module identifier.
+     * @param SnapshotIndex|null $cached Optional process-local reader.
      *
      * @return SnapshotIndex|null
      * @since 0.1.0
      */
-    private function openCurrent(string $module): ?SnapshotIndex
+    private function openCurrent(string $module, ?SnapshotIndex $cached = null): ?SnapshotIndex
     {
         $moduleRoot = $this->moduleRoot($module);
         $json = @file_get_contents($moduleRoot . '/current.json');
@@ -341,6 +397,8 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
             || ($pointer['format'] ?? null) !== 'getbible.scripture.current/v1'
             || !is_string($pointer['generation'] ?? null)
             || preg_match('/^[0-9a-f]{64}$/D', $pointer['generation']) !== 1
+            || !is_string($pointer['index_sha256'] ?? null)
+            || preg_match('/^[0-9a-f]{64}$/D', $pointer['index_sha256']) !== 1
             || !is_string($pointer['activated_at'] ?? null)
             || !is_string($pointer['expires_at'] ?? null)
         ) {
@@ -348,13 +406,24 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
         }
 
         try {
-            $activated = new \DateTimeImmutable($pointer['activated_at']);
-            $expires = new \DateTimeImmutable($pointer['expires_at']);
+            $activated = $this->parseTimestamp($pointer['activated_at']);
+            $expires = $this->parseTimestamp($pointer['expires_at']);
+
+            if (
+                $cached !== null
+                && $cached->generationId() === $pointer['generation']
+                && $cached->indexSha256() === $pointer['index_sha256']
+                && $cached->activatedAt() == $activated
+                && $cached->expiresAt() == $expires
+            ) {
+                return $cached;
+            }
 
             return SnapshotIndex::open(
                 $moduleRoot . '/generations/' . $pointer['generation'],
                 $activated,
                 $expires,
+                $pointer['index_sha256'],
             );
         } catch (\Throwable) {
             return null;
@@ -375,25 +444,297 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
     }
 
     /**
-     * Validates a traversal-safe native module identifier.
+     * Atomically activates a verified snapshot reader.
      *
-     * @param string $module Candidate identifier.
+     * @param string $moduleRoot Controlled per-module cache root.
+     * @param SnapshotIndex $snapshot Verified generation.
      *
-     * @return string
-     * @since 0.1.0
+     * @return void
+     * @since 1.0.0
      */
-    private function validateModule(string $module): string
+    private function activate(string $moduleRoot, SnapshotIndex $snapshot): void
     {
-        if (
-            $module === ''
-            || $module === '.'
-            || $module === '..'
-            || preg_match('/^[A-Za-z0-9_.+-]+$/D', $module) !== 1
-        ) {
-            throw new \InvalidArgumentException(sprintf('Invalid SWORD module identifier "%s".', $module));
+        $pointer = [
+            'format' => 'getbible.scripture.current/v1',
+            'generation' => $snapshot->generationId(),
+            'index_sha256' => $snapshot->indexSha256(),
+            'activated_at' => $snapshot->activatedAt()->format(DATE_ATOM),
+            'expires_at' => $snapshot->expiresAt()->format(DATE_ATOM),
+        ];
+
+        try {
+            $pointerJson = json_encode(
+                $pointer,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+            ) . "\n";
+        } catch (\JsonException $exception) {
+            throw new \RuntimeException('Unable to serialize the active snapshot pointer.', 0, $exception);
         }
 
-        return $module;
+        $temporary = $moduleRoot . '/current.' . bin2hex(random_bytes(8)) . '.tmp';
+        $this->writeSynchronized($temporary, $pointerJson);
+
+        if (!rename($temporary, $moduleRoot . '/current.json')) {
+            @unlink($temporary);
+            throw new \RuntimeException('Unable to atomically activate the snapshot generation.');
+        }
+    }
+
+    /**
+     * Finds the newest complete cached generation after pointer corruption.
+     *
+     * @param string $module Exact installed module identifier.
+     * @param string $moduleRoot Controlled per-module cache root.
+     *
+     * @return SnapshotIndex|null
+     * @since 1.0.0
+     */
+    private function recoverGeneration(string $module, string $moduleRoot): ?SnapshotIndex
+    {
+        $generations = $this->generationDirectories($moduleRoot);
+
+        foreach ($generations as $generation => $modifiedAt) {
+            $path = $moduleRoot . '/generations/' . $generation;
+            $json = @file_get_contents($path . '/index.json');
+
+            if (!is_string($json)) {
+                continue;
+            }
+
+            $activated = (new \DateTimeImmutable('@' . $modifiedAt))
+                ->setTimezone(new \DateTimeZone('UTC'));
+            $expires = $activated->add($this->configuration->refreshInterval());
+
+            try {
+                $snapshot = SnapshotIndex::open(
+                    $path,
+                    $activated,
+                    $expires,
+                    hash('sha256', $json),
+                );
+
+                if ($snapshot->metadata()->name()->bytes() !== $module) {
+                    continue;
+                }
+
+                return $snapshot;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Replaces a corrupt same-hash generation when it has no active readers.
+     *
+     * @param string $moduleRoot Controlled per-module cache root.
+     * @param string $generation Content-addressed generation identifier.
+     * @param string $staging Complete staged generation.
+     * @param string $destination Corrupt committed generation.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function repairGeneration(
+        string $moduleRoot,
+        string $generation,
+        string $staging,
+        string $destination,
+    ): void {
+        $repaired = GenerationLease::cleanup(
+            $moduleRoot,
+            $generation,
+            function () use ($destination, $staging, $generation): void {
+                $quarantine = dirname($destination) . '/.corrupt-'
+                    . $generation . '-' . bin2hex(random_bytes(6));
+
+                if (!rename($destination, $quarantine)) {
+                    throw new \RuntimeException('Unable to quarantine a corrupt snapshot generation.');
+                }
+
+                if (!rename($staging, $destination)) {
+                    if (!rename($quarantine, $destination)) {
+                        throw new \RuntimeException(
+                            'Unable to replace or restore a corrupt snapshot generation.',
+                        );
+                    }
+
+                    throw new \RuntimeException('Unable to replace a corrupt snapshot generation.');
+                }
+
+                Folder::delete($quarantine);
+            },
+        );
+
+        if (!$repaired) {
+            throw new \RuntimeException(
+                'A corrupt snapshot generation cannot be repaired while it has active readers.',
+            );
+        }
+    }
+
+    /**
+     * Deletes unleased historical generations after successful activation.
+     *
+     * @param string $moduleRoot Controlled per-module cache root.
+     * @param string $current Active generation identifier.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function cleanupGenerations(string $moduleRoot, string $current): void
+    {
+        $generations = $this->generationDirectories($moduleRoot);
+        $retained = [$current => true];
+
+        foreach (array_keys($generations) as $generation) {
+            if (isset($retained[$generation])) {
+                continue;
+            }
+
+            if (count($retained) < self::RETAIN_GENERATIONS) {
+                $retained[$generation] = true;
+                continue;
+            }
+
+            GenerationLease::cleanup(
+                $moduleRoot,
+                $generation,
+                static function () use ($moduleRoot, $generation): void {
+                    $path = $moduleRoot . '/generations/' . $generation;
+
+                    if (is_dir($path)) {
+                        Folder::delete($path);
+                    }
+                },
+            );
+        }
+    }
+
+    /**
+     * Returns committed generation directories newest first.
+     *
+     * @param string $moduleRoot Controlled per-module cache root.
+     *
+     * @return array<string, int>
+     * @since 1.0.0
+     */
+    private function generationDirectories(string $moduleRoot): array
+    {
+        $path = $moduleRoot . '/generations';
+
+        if (!is_dir($path)) {
+            return [];
+        }
+
+        $generations = [];
+
+        foreach (new \DirectoryIterator($path) as $item) {
+            if (
+                $item->isDot()
+                || !$item->isDir()
+                || $item->isLink()
+                || preg_match('/^[0-9a-f]{64}$/D', $item->getFilename()) !== 1
+            ) {
+                continue;
+            }
+
+            $generations[$item->getFilename()] = $item->getMTime();
+        }
+
+        arsort($generations, SORT_NUMERIC);
+
+        return $generations;
+    }
+
+    /**
+     * Removes abandoned staging, quarantine, and pointer files.
+     *
+     * @param string $moduleRoot Controlled per-module cache root.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    private function scavengeInterruptedWrites(string $moduleRoot): void
+    {
+        $cutoff = time() - self::STALE_TEMPORARY_SECONDS;
+        $generations = $moduleRoot . '/generations';
+
+        if (is_dir($generations)) {
+            foreach (new \DirectoryIterator($generations) as $item) {
+                $name = $item->getFilename();
+
+                if (
+                    $item->isDot()
+                    || !$item->isDir()
+                    || $item->isLink()
+                    || $item->getMTime() > $cutoff
+                    || (
+                        !str_starts_with($name, '.staging-')
+                        && !str_starts_with($name, '.corrupt-')
+                    )
+                ) {
+                    continue;
+                }
+
+                Folder::delete($item->getPathname());
+            }
+        }
+
+        foreach (glob($moduleRoot . '/current.*.tmp') ?: [] as $temporary) {
+            $modifiedAt = filemtime($temporary);
+
+            if (is_int($modifiedAt) && $modifiedAt <= $cutoff && is_file($temporary) && !is_link($temporary)) {
+                @unlink($temporary);
+            }
+        }
+    }
+
+    /**
+     * Parses an exact RFC 3339 timestamp emitted by this package.
+     *
+     * @param string $value Serialized timestamp.
+     *
+     * @return \DateTimeImmutable
+     * @since 1.0.0
+     */
+    private function parseTimestamp(string $value): \DateTimeImmutable
+    {
+        $date = \DateTimeImmutable::createFromFormat(DATE_ATOM, $value);
+        $errors = \DateTimeImmutable::getLastErrors();
+
+        if (
+            !$date instanceof \DateTimeImmutable
+            || ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))
+            || $date->format(DATE_ATOM) !== $value
+        ) {
+            throw new ContractException('Snapshot pointer timestamp is invalid.');
+        }
+
+        return $date;
+    }
+
+    /**
+     * Retains a bounded least-recently-used process-local snapshot reader.
+     *
+     * @param string $module Exact module identifier.
+     * @param SnapshotIndex $snapshot Verified snapshot reader.
+     *
+     * @return SnapshotIndex
+     * @since 1.0.0
+     */
+    private function remember(string $module, SnapshotIndex $snapshot): SnapshotIndex
+    {
+        unset($this->snapshots[$module]);
+        $this->snapshots[$module] = $snapshot;
+
+        if (count($this->snapshots) > self::SNAPSHOT_CACHE_LIMIT) {
+            array_shift($this->snapshots);
+        }
+
+        return $snapshot;
     }
 
     /**

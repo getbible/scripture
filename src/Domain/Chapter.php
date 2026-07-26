@@ -32,6 +32,19 @@ final class Chapter
         private string $bookKey,
         private int $number,
     ) {
+        if ($number < 1 || !in_array($number, $snapshot->chapterNumbers($bookKey), true)) {
+            throw new InvalidReferenceException('A Chapter requires a positive indexed chapter number.');
+        }
+
+        $metadata = $snapshot->bookMetadata($bookKey);
+
+        if (
+            $metadata['testament'] !== $book->testament()
+            || $metadata['position'] !== $book->position()
+            || $snapshot->metadata()->name()->bytes() !== $book->translation()->moduleName()
+        ) {
+            throw new \InvalidArgumentException('A Chapter snapshot must belong to its parent Book.');
+        }
     }
 
     /**

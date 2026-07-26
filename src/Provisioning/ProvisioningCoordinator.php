@@ -8,10 +8,11 @@ namespace GetBible\Scripture\Provisioning;
 
 use GetBible\Scripture\Catalog\ModuleCatalogInterface;
 use GetBible\Scripture\Event\EventName;
+use GetBible\Scripture\Event\LifecycleEventDispatcher;
 use GetBible\Scripture\Infrastructure\Lock\ModuleRootLockInterface;
+use GetBible\Scripture\Module\ModuleIdentifier;
 use GetBible\Scripture\Snapshot\SnapshotManagerInterface;
 use Joomla\Event\DispatcherInterface;
-use Joomla\Event\Event;
 
 /**
  * Serializes module mutation and invalidates process caches after success.
@@ -135,13 +136,14 @@ final class ProvisioningCoordinator implements ProvisioningCoordinatorInterface
      */
     private function execute(string $operation, array $modules, callable $callback): ProvisioningResult
     {
-        $this->dispatcher->dispatch(
+        LifecycleEventDispatcher::dispatch(
+            $this->dispatcher,
             EventName::PROVISIONING_STARTED,
-            new Event(EventName::PROVISIONING_STARTED, [
+            [
                 'operation' => $operation,
                 'modules' => $modules,
                 'capabilities' => $this->capabilities(),
-            ]),
+            ],
         );
 
         try {
@@ -149,24 +151,26 @@ final class ProvisioningCoordinator implements ProvisioningCoordinatorInterface
 
             $this->catalog->clear();
             $this->snapshots->clear();
-            $this->dispatcher->dispatch(
+            LifecycleEventDispatcher::dispatch(
+                $this->dispatcher,
                 EventName::PROVISIONING_COMPLETED,
-                new Event(EventName::PROVISIONING_COMPLETED, [
+                [
                     'operation' => $operation,
                     'modules' => $modules,
                     'result' => $result,
-                ]),
+                ],
             );
 
             return $result;
         } catch (\Throwable $exception) {
-            $this->dispatcher->dispatch(
+            LifecycleEventDispatcher::dispatch(
+                $this->dispatcher,
                 EventName::PROVISIONING_FAILED,
-                new Event(EventName::PROVISIONING_FAILED, [
+                [
                     'operation' => $operation,
                     'modules' => $modules,
                     'exception' => $exception,
-                ]),
+                ],
             );
 
             throw $exception;
@@ -191,12 +195,7 @@ final class ProvisioningCoordinator implements ProvisioningCoordinatorInterface
                 throw new \InvalidArgumentException('Module identifiers must be strings.');
             }
 
-            $module = trim($module);
-
-            if ($module === '' || str_contains($module, "\0")) {
-                throw new \InvalidArgumentException('Module identifiers must be non-empty strings without NUL bytes.');
-            }
-
+            $module = ModuleIdentifier::normalize($module);
             $normalized[$module] = $module;
         }
 

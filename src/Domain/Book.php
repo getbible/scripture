@@ -40,6 +40,10 @@ final class Book
         private SnapshotIndex $snapshot,
         private string $bookKey,
     ) {
+        if ($snapshot->metadata()->name()->bytes() !== $translation->moduleName()) {
+            throw new \InvalidArgumentException('A Book snapshot must belong to its parent Translation.');
+        }
+
         $this->metadata = $snapshot->bookMetadata($bookKey);
     }
 

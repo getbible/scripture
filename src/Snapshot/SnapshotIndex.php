@@ -14,6 +14,7 @@ use GetBible\Scripture\Domain\TranslationMetadata;
 use GetBible\Scripture\Domain\Verse;
 use GetBible\Scripture\Exception\ContractException;
 use GetBible\Scripture\Exception\ReferenceNotFoundException;
+use GetBible\Scripture\Infrastructure\Lock\GenerationLease;
 
 /**
  * Reads immutable translation objects by exact offset from one snapshot.
@@ -37,6 +38,9 @@ final class SnapshotIndex
      * @param array<string, mixed> $index Decoded index.
      * @param \DateTimeImmutable $activatedAt Activation time.
      * @param \DateTimeImmutable $expiresAt Freshness deadline.
+     * @param string $generation Content-addressed generation identifier.
+     * @param string $indexSha256 Verified serialized index digest.
+     * @param GenerationLease $lease Active generation reader lease.
      *
      * @since 0.1.0
      */
@@ -45,6 +49,9 @@ final class SnapshotIndex
         private array $index,
         private \DateTimeImmutable $activatedAt,
         private \DateTimeImmutable $expiresAt,
+        private string $generation,
+        private string $indexSha256,
+        private GenerationLease $lease,
     ) {
     }
 
@@ -54,6 +61,7 @@ final class SnapshotIndex
      * @param string $generationPath Generation directory.
      * @param \DateTimeImmutable $activatedAt Activation time.
      * @param \DateTimeImmutable $expiresAt Freshness deadline.
+     * @param string|null $expectedIndexSha256 Optional pointer-bound index digest.
      *
      * @return self
      * @since 0.1.0
@@ -62,13 +70,46 @@ final class SnapshotIndex
         string $generationPath,
         \DateTimeImmutable $activatedAt,
         \DateTimeImmutable $expiresAt,
+        ?string $expectedIndexSha256 = null,
     ): self {
+        $generation = basename($generationPath);
+
+        if (
+            preg_match('/^[0-9a-f]{64}$/D', $generation) !== 1
+            || !is_dir($generationPath)
+            || is_link($generationPath)
+            || $expiresAt <= $activatedAt
+            || (
+                $expectedIndexSha256 !== null
+                && preg_match('/^[0-9a-f]{64}$/D', $expectedIndexSha256) !== 1
+            )
+        ) {
+            throw new ContractException('Snapshot generation identity or activation interval is invalid.');
+        }
+
+        $lease = new GenerationLease(dirname($generationPath, 2), $generation);
         $indexPath = $generationPath . '/index.json';
         $modulePath = $generationPath . '/module.ndjson';
+
+        if (
+            !is_file($indexPath)
+            || is_link($indexPath)
+            || !is_file($modulePath)
+            || is_link($modulePath)
+        ) {
+            throw new ContractException(sprintf('Snapshot generation "%s" is incomplete.', $generationPath));
+        }
+
         $json = file_get_contents($indexPath);
 
-        if ($json === false || !is_file($modulePath)) {
-            throw new ContractException(sprintf('Snapshot generation "%s" is incomplete.', $generationPath));
+        if (!is_string($json)) {
+            throw new ContractException(sprintf('Snapshot generation "%s" is unreadable.', $generationPath));
+        }
+
+        $indexSha256 = hash('sha256', $json);
+
+        if ($expectedIndexSha256 !== null && !hash_equals($expectedIndexSha256, $indexSha256)) {
+            throw new ContractException('Snapshot index digest does not match its active pointer.');
         }
 
         try {
@@ -83,8 +124,25 @@ final class SnapshotIndex
             ($index['format'] ?? null) !== 'getbible.scripture.snapshot/v1'
             || !is_string($index['stream_sha256'] ?? null)
             || preg_match('/^[0-9a-f]{64}$/D', $index['stream_sha256']) !== 1
+            || !hash_equals($generation, $index['stream_sha256'])
+            || !is_int($index['module_file_size'] ?? null)
+            || $index['module_file_size'] < 1
+            || !is_string($index['module_file_sha256'] ?? null)
+            || preg_match('/^[0-9a-f]{64}$/D', $index['module_file_sha256']) !== 1
         ) {
             throw new ContractException('Snapshot index structure is invalid.');
+        }
+
+        $moduleSize = filesize($modulePath);
+        $moduleSha256 = hash_file('sha256', $modulePath);
+
+        if (
+            !is_int($moduleSize)
+            || $moduleSize !== $index['module_file_size']
+            || !is_string($moduleSha256)
+            || !hash_equals($index['module_file_sha256'], $moduleSha256)
+        ) {
+            throw new ContractException('Snapshot module stream does not match its integrity manifest.');
         }
 
         StructuredData::object($index['module'] ?? null, 'Snapshot module metadata');
@@ -92,7 +150,15 @@ final class SnapshotIndex
         StructuredData::list($index['introductions'] ?? null, 'Snapshot introductions');
         StructuredData::object($index['books'] ?? null, 'Snapshot books');
 
-        return new self($generationPath, $index, $activatedAt, $expiresAt);
+        return new self(
+            $generationPath,
+            $index,
+            $activatedAt,
+            $expiresAt,
+            $generation,
+            $indexSha256,
+            $lease,
+        );
     }
 
     /**
@@ -105,6 +171,8 @@ final class SnapshotIndex
         if (is_resource($this->stream)) {
             fclose($this->stream);
         }
+
+        $this->lease->release();
     }
 
     /**
@@ -118,6 +186,28 @@ final class SnapshotIndex
         return TranslationMetadata::fromRecord(
             StructuredData::object($this->index['module'] ?? null, 'Snapshot module metadata'),
         );
+    }
+
+    /**
+     * Returns the content-addressed generation identifier.
+     *
+     * @return string
+     * @since 1.0.0
+     */
+    public function generationId(): string
+    {
+        return $this->generation;
+    }
+
+    /**
+     * Returns the verified serialized index digest.
+     *
+     * @return string
+     * @since 1.0.0
+     */
+    public function indexSha256(): string
+    {
+        return $this->indexSha256;
     }
 
     /**
@@ -276,7 +366,21 @@ final class SnapshotIndex
             ));
         }
 
-        return Verse::fromRecord($this->readRecord($location));
+        $object = Verse::fromRecord($this->readRecord($location));
+        $scope = $object->scope();
+        [$testament, $book] = $this->bookCoordinates($bookKey);
+
+        if (
+            $scope->testament() !== $testament
+            || $scope->book() !== $book
+            || $scope->chapter() !== $chapter
+            || $scope->verse() !== $verse
+            || $scope->suffix() !== $suffix
+        ) {
+            throw new ContractException('Snapshot verse location does not match its indexed coordinate.');
+        }
+
+        return $object;
     }
 
     /**
@@ -331,7 +435,21 @@ final class SnapshotIndex
         $verses = [];
 
         foreach ($coordinates as $coordinate) {
-            $verses[] = Verse::fromRecord($this->readRecord($coordinate['location']));
+            $object = Verse::fromRecord($this->readRecord($coordinate['location']));
+            $scope = $object->scope();
+            [$testament, $book] = $this->bookCoordinates($bookKey);
+
+            if (
+                $scope->testament() !== $testament
+                || $scope->book() !== $book
+                || $scope->chapter() !== $chapter
+                || $scope->verse() !== $coordinate['verse']
+                || $scope->suffix() !== $coordinate['suffix']
+            ) {
+                throw new ContractException('Snapshot verse range location does not match its indexed coordinate.');
+            }
+
+            $verses[] = $object;
         }
 
         return $verses;
@@ -372,7 +490,32 @@ final class SnapshotIndex
                 throw new ContractException('Snapshot introduction location is invalid.');
             }
 
-            $introductions[] = Introduction::fromRecord($this->readRecord($location));
+            $introduction = Introduction::fromRecord($this->readRecord($location));
+            $scope = $introduction->scope();
+
+            if ($bookKey === null) {
+                $matches = $scope->book() === 0;
+            } else {
+                [$testament, $book] = $this->bookCoordinates($bookKey);
+                $matches = $scope->testament() === $testament
+                    && $scope->book() === $book
+                    && (
+                        ($chapter === null && $scope->chapter() === 0)
+                        || (
+                            $chapter !== null
+                            && $scope->chapter() === $chapter
+                            && $scope->verse() === 0
+                        )
+                    );
+            }
+
+            if (!$matches) {
+                throw new ContractException(
+                    'Snapshot introduction location does not match its indexed coordinate.',
+                );
+            }
+
+            $introductions[] = $introduction;
         }
 
         return $introductions;
@@ -489,8 +632,16 @@ final class SnapshotIndex
         $location = StructuredData::object($location, 'Snapshot record location');
         $offset = $location['offset'] ?? null;
         $length = $location['length'] ?? null;
+        $sha256 = $location['sha256'] ?? null;
 
-        if (!is_int($offset) || $offset < 0 || !is_int($length) || $length < 2) {
+        if (
+            !is_int($offset)
+            || $offset < 0
+            || !is_int($length)
+            || $length < 2
+            || !is_string($sha256)
+            || preg_match('/^[0-9a-f]{64}$/D', $sha256) !== 1
+        ) {
             throw new ContractException('Snapshot record location is invalid.');
         }
 
@@ -526,6 +677,42 @@ final class SnapshotIndex
             throw new ContractException('Snapshot location does not reference an entry record.');
         }
 
+        try {
+            $canonical = json_encode(
+                $record,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+            );
+        } catch (\JsonException $exception) {
+            throw new ContractException('Snapshot record cannot be integrity-checked.', 0, $exception);
+        }
+
+        if (!hash_equals($sha256, hash('sha256', $canonical))) {
+            throw new ContractException('Snapshot record does not match its indexed digest.');
+        }
+
         return $record;
+    }
+
+    /**
+     * Parses a validated compound book key.
+     *
+     * @param string $bookKey Compound testament/book key.
+     *
+     * @return array{int, int}
+     * @since 1.0.0
+     */
+    private function bookCoordinates(string $bookKey): array
+    {
+        $parts = explode(':', $bookKey, 2);
+
+        if (
+            count($parts) !== 2
+            || preg_match('/^[1-9][0-9]*$/D', $parts[0]) !== 1
+            || preg_match('/^[1-9][0-9]*$/D', $parts[1]) !== 1
+        ) {
+            throw new ContractException('Snapshot book key is invalid.');
+        }
+
+        return [(int) $parts[0], (int) $parts[1]];
     }
 }
