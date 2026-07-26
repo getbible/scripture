@@ -302,7 +302,7 @@ final class SnapshotIndex
         $coordinates = [];
 
         foreach ($locations as $key => $location) {
-            if (!is_string($key) || !is_array($location)) {
+            if (!is_array($location)) {
                 throw new ContractException('Snapshot verse index is invalid.');
             }
 
