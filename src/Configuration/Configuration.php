@@ -157,7 +157,13 @@ final class Configuration
      */
     public function cachePath(): string
     {
-        return (string) $this->registry->get('cache_path');
+        $value = $this->registry->get('cache_path');
+
+        if (!is_string($value) || $value === '') {
+            throw new \LogicException('Normalized cache path configuration is invalid.');
+        }
+
+        return $value;
     }
 
     /**
@@ -168,7 +174,13 @@ final class Configuration
      */
     public function refreshIntervalSpec(): string
     {
-        return (string) $this->registry->get('refresh_interval');
+        $value = $this->registry->get('refresh_interval');
+
+        if (!is_string($value) || $value === '') {
+            throw new \LogicException('Normalized refresh interval configuration is invalid.');
+        }
+
+        return $value;
     }
 
     /**
@@ -190,7 +202,13 @@ final class Configuration
      */
     public function autoRefresh(): bool
     {
-        return (bool) $this->registry->get('auto_refresh');
+        $value = $this->registry->get('auto_refresh');
+
+        if (!is_bool($value)) {
+            throw new \LogicException('Normalized automatic refresh configuration is invalid.');
+        }
+
+        return $value;
     }
 
     /**
@@ -201,7 +219,13 @@ final class Configuration
      */
     public function lockTimeout(): int
     {
-        return (int) $this->registry->get('lock_timeout');
+        $value = $this->registry->get('lock_timeout');
+
+        if (!is_int($value) || $value < 1) {
+            throw new \LogicException('Normalized lock timeout configuration is invalid.');
+        }
+
+        return $value;
     }
 
     /**
@@ -239,7 +263,13 @@ final class Configuration
      */
     public function provisioningEnabled(): bool
     {
-        return (bool) $this->registry->get('provisioning_enabled');
+        $value = $this->registry->get('provisioning_enabled');
+
+        if (!is_bool($value)) {
+            throw new \LogicException('Normalized provisioning policy is invalid.');
+        }
+
+        return $value;
     }
 
     /**
@@ -250,7 +280,13 @@ final class Configuration
      */
     public function installAll(): bool
     {
-        return (bool) $this->registry->get('install_all');
+        $value = $this->registry->get('install_all');
+
+        if (!is_bool($value)) {
+            throw new \LogicException('Normalized all-module installation policy is invalid.');
+        }
+
+        return $value;
     }
 
     /**

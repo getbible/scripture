@@ -33,7 +33,7 @@ final class ProvisioningResult
      * Creates a complete provisioning result.
      *
      * @param string $operation Backend operation name.
-     * @param list<ModuleProvisioningResult> $modules Per-module outcomes.
+     * @param array<array-key, mixed> $modules Per-module outcomes.
      *
      * @since 0.2.0
      */
@@ -43,14 +43,18 @@ final class ProvisioningResult
             throw new \InvalidArgumentException('A provisioning operation name is required.');
         }
 
+        $validated = [];
+
         foreach ($modules as $module) {
             if (!$module instanceof ModuleProvisioningResult) {
                 throw new \InvalidArgumentException('Provisioning results must contain module outcomes.');
             }
+
+            $validated[] = $module;
         }
 
         $this->operation = $operation;
-        $this->modules = array_values($modules);
+        $this->modules = $validated;
     }
 
     /**

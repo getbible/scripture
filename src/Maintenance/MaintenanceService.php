@@ -486,10 +486,6 @@ final class MaintenanceService implements MaintenanceServiceInterface
             }
         });
 
-        if (!$result instanceof MaintenanceResult) {
-            throw new \LogicException('The maintenance lock returned an invalid result.');
-        }
-
         return $result;
     }
 
@@ -519,7 +515,7 @@ final class MaintenanceService implements MaintenanceServiceInterface
     /**
      * Validates, trims, and de-duplicates explicit module identifiers.
      *
-     * @param list<string> $modules Candidate identifiers.
+     * @param array<array-key, mixed> $modules Candidate identifiers.
      *
      * @return list<string>
      * @since 0.3.0

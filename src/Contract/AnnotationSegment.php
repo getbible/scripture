@@ -34,7 +34,7 @@ final class AnnotationSegment
     /**
      * Validates and creates a segment from a contract object.
      *
-     * @param array<string, mixed> $segment Candidate segment.
+     * @param array<array-key, mixed> $segment Candidate segment.
      * @param int $index Segment index for diagnostics.
      *
      * @return self
@@ -42,6 +42,10 @@ final class AnnotationSegment
      */
     public static function fromArray(array $segment, int $index): self
     {
+        $segment = StructuredData::object(
+            $segment,
+            sprintf('Annotation segment %d', $index),
+        );
         $kind = $segment['kind'] ?? null;
         $interpretation = $segment['interpretation'] ?? null;
         $raw = $segment['raw'] ?? null;

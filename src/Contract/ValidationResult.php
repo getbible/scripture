@@ -72,6 +72,12 @@ final class ValidationResult
      */
     public function streamSha256(): string
     {
-        return (string) $this->footer['stream_sha256'];
+        $sha256 = $this->footer['stream_sha256'] ?? null;
+
+        if (!is_string($sha256)) {
+            throw new \LogicException('Validated footer state has no stream digest.');
+        }
+
+        return $sha256;
     }
 }

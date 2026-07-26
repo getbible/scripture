@@ -9,6 +9,7 @@ namespace GetBible\Scripture\Domain;
 use GetBible\Scripture\Contract\AnnotationSegment;
 use GetBible\Scripture\Contract\ByteValue;
 use GetBible\Scripture\Contract\OfficialAttributes;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Contract\VerseScope;
 use GetBible\Scripture\Exception\ContractException;
 
@@ -48,13 +49,15 @@ final class Introduction
     /**
      * Validates and hydrates an introduction from an entry record.
      *
-     * @param array<string, mixed> $record Entry record.
+     * @param array<array-key, mixed> $record Entry record.
      *
      * @return self
      * @since 0.1.0
      */
     public static function fromRecord(array $record): self
     {
+        $record = StructuredData::object($record, 'Introduction record');
+
         if (
             ($record['type'] ?? null) !== 'entry'
             || !is_array($record['scope'] ?? null)

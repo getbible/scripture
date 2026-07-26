@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Snapshot;
 
 use GetBible\Scripture\Contract\ByteValue;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Domain\ConfigEntry;
 use GetBible\Scripture\Domain\Introduction;
 use GetBible\Scripture\Domain\TranslationMetadata;
@@ -76,18 +77,20 @@ final class SnapshotIndex
             throw new ContractException('Snapshot index JSON is invalid.', 0, $exception);
         }
 
+        $index = StructuredData::object($index, 'Snapshot index');
+
         if (
-            !is_array($index)
-            || ($index['format'] ?? null) !== 'getbible.scripture.snapshot/v1'
+            ($index['format'] ?? null) !== 'getbible.scripture.snapshot/v1'
             || !is_string($index['stream_sha256'] ?? null)
             || preg_match('/^[0-9a-f]{64}$/D', $index['stream_sha256']) !== 1
-            || !is_array($index['module'] ?? null)
-            || !is_array($index['config_entries'] ?? null)
-            || !is_array($index['introductions'] ?? null)
-            || !is_array($index['books'] ?? null)
         ) {
             throw new ContractException('Snapshot index structure is invalid.');
         }
+
+        StructuredData::object($index['module'] ?? null, 'Snapshot module metadata');
+        StructuredData::list($index['config_entries'] ?? null, 'Snapshot configuration entries');
+        StructuredData::list($index['introductions'] ?? null, 'Snapshot introductions');
+        StructuredData::object($index['books'] ?? null, 'Snapshot books');
 
         return new self($generationPath, $index, $activatedAt, $expiresAt);
     }
@@ -112,7 +115,9 @@ final class SnapshotIndex
      */
     public function metadata(): TranslationMetadata
     {
-        return TranslationMetadata::fromRecord($this->index['module']);
+        return TranslationMetadata::fromRecord(
+            StructuredData::object($this->index['module'] ?? null, 'Snapshot module metadata'),
+        );
     }
 
     /**
@@ -125,12 +130,15 @@ final class SnapshotIndex
     {
         $entries = [];
 
-        foreach ($this->index['config_entries'] as $record) {
-            if (!is_array($record)) {
-                throw new ContractException('Snapshot configuration index is invalid.');
-            }
-
-            $entries[] = ConfigEntry::fromRecord($record);
+        foreach (
+            StructuredData::list(
+                $this->index['config_entries'] ?? null,
+                'Snapshot configuration entries',
+            ) as $index => $record
+        ) {
+            $entries[] = ConfigEntry::fromRecord(
+                StructuredData::object($record, sprintf('Snapshot configuration entry %d', $index)),
+            );
         }
 
         return $entries;
@@ -160,7 +168,7 @@ final class SnapshotIndex
      */
     public function bookKeys(): array
     {
-        return array_keys($this->index['books']);
+        return array_keys(StructuredData::object($this->index['books'] ?? null, 'Snapshot books'));
     }
 
     /**
@@ -205,12 +213,12 @@ final class SnapshotIndex
     public function chapterNumbers(string $bookKey): array
     {
         $book = $this->bookData($bookKey);
+        $chapters = StructuredData::map(
+            $book['chapters'] ?? null,
+            sprintf('Snapshot book "%s" chapters', $bookKey),
+        );
 
-        if (!is_array($book['chapters'] ?? null)) {
-            throw new ContractException(sprintf('Snapshot book "%s" chapters are invalid.', $bookKey));
-        }
-
-        return array_map('intval', array_keys($book['chapters']));
+        return array_map('intval', array_keys($chapters));
     }
 
     /**
@@ -225,15 +233,12 @@ final class SnapshotIndex
     public function verseNumbers(string $bookKey, int $chapter): array
     {
         $chapterData = $this->chapterData($bookKey, $chapter);
-
-        if (!is_array($chapterData['verses'] ?? null)) {
-            throw new ContractException('Snapshot chapter verses are invalid.');
-        }
+        $verses = StructuredData::object($chapterData['verses'] ?? null, 'Snapshot chapter verses');
 
         $numbers = [];
 
-        foreach (array_keys($chapterData['verses']) as $key) {
-            $parts = explode(':', (string) $key, 2);
+        foreach (array_keys($verses) as $key) {
+            $parts = explode(':', $key, 2);
             $numbers[] = (int) $parts[0];
         }
 
@@ -258,7 +263,8 @@ final class SnapshotIndex
     {
         $chapterData = $this->chapterData($bookKey, $chapter);
         $verseKey = $verse . ':' . $suffix;
-        $location = $chapterData['verses'][$verseKey] ?? null;
+        $locations = StructuredData::object($chapterData['verses'] ?? null, 'Snapshot chapter verses');
+        $location = $locations[$verseKey] ?? null;
 
         if (!is_array($location)) {
             throw new ReferenceNotFoundException(sprintf(
@@ -291,11 +297,7 @@ final class SnapshotIndex
         ?int $end = null,
     ): array {
         $chapterData = $this->chapterData($bookKey, $chapter);
-        $locations = $chapterData['verses'] ?? null;
-
-        if (!is_array($locations)) {
-            throw new ContractException('Snapshot chapter verses are invalid.');
-        }
+        $locations = StructuredData::object($chapterData['verses'] ?? null, 'Snapshot chapter verses');
 
         $coordinates = [];
 
@@ -347,15 +349,20 @@ final class SnapshotIndex
     public function introductions(?string $bookKey = null, ?int $chapter = null): array
     {
         if ($bookKey === null) {
-            $locations = $this->index['introductions'];
+            $locations = StructuredData::list(
+                $this->index['introductions'] ?? null,
+                'Snapshot module introductions',
+            );
         } elseif ($chapter === null) {
-            $locations = $this->bookData($bookKey)['introductions'] ?? null;
+            $locations = StructuredData::list(
+                $this->bookData($bookKey)['introductions'] ?? null,
+                'Snapshot book introductions',
+            );
         } else {
-            $locations = $this->chapterData($bookKey, $chapter)['introductions'] ?? null;
-        }
-
-        if (!is_array($locations)) {
-            throw new ContractException('Snapshot introduction index is invalid.');
+            $locations = StructuredData::list(
+                $this->chapterData($bookKey, $chapter)['introductions'] ?? null,
+                'Snapshot chapter introductions',
+            );
         }
 
         $introductions = [];
@@ -427,13 +434,14 @@ final class SnapshotIndex
      */
     private function bookData(string $bookKey): array
     {
-        $book = $this->index['books'][$bookKey] ?? null;
+        $books = StructuredData::object($this->index['books'] ?? null, 'Snapshot books');
+        $book = $books[$bookKey] ?? null;
 
         if (!is_array($book)) {
             throw new ReferenceNotFoundException(sprintf('Book "%s" is not present.', $bookKey));
         }
 
-        return $book;
+        return StructuredData::object($book, sprintf('Snapshot book "%s"', $bookKey));
     }
 
     /**
@@ -448,7 +456,11 @@ final class SnapshotIndex
     private function chapterData(string $bookKey, int $chapter): array
     {
         $book = $this->bookData($bookKey);
-        $chapterData = $book['chapters'][(string) $chapter] ?? null;
+        $chapters = StructuredData::map(
+            $book['chapters'] ?? null,
+            sprintf('Snapshot book "%s" chapters', $bookKey),
+        );
+        $chapterData = $chapters[(string) $chapter] ?? null;
 
         if (!is_array($chapterData)) {
             throw new ReferenceNotFoundException(sprintf(
@@ -458,19 +470,23 @@ final class SnapshotIndex
             ));
         }
 
-        return $chapterData;
+        return StructuredData::object(
+            $chapterData,
+            sprintf('Snapshot book "%s" chapter %d', $bookKey, $chapter),
+        );
     }
 
     /**
      * Reads one exact serialized entry record.
      *
-     * @param array<string, mixed> $location Indexed offset and length.
+     * @param array<array-key, mixed> $location Indexed offset and length.
      *
      * @return array<string, mixed>
      * @since 0.1.0
      */
     private function readRecord(array $location): array
     {
+        $location = StructuredData::object($location, 'Snapshot record location');
         $offset = $location['offset'] ?? null;
         $length = $location['length'] ?? null;
 
@@ -479,11 +495,13 @@ final class SnapshotIndex
         }
 
         if (!is_resource($this->stream)) {
-            $this->stream = fopen($this->rawExportPath(), 'rb');
+            $stream = fopen($this->rawExportPath(), 'rb');
 
-            if (!is_resource($this->stream)) {
+            if (!is_resource($stream)) {
                 throw new ContractException('Unable to open the snapshot module stream.');
             }
+
+            $this->stream = $stream;
         }
 
         if (fseek($this->stream, $offset) !== 0) {
@@ -502,7 +520,9 @@ final class SnapshotIndex
             throw new ContractException('Snapshot record JSON is invalid.', 0, $exception);
         }
 
-        if (!is_array($record) || array_is_list($record) || ($record['type'] ?? null) !== 'entry') {
+        $record = StructuredData::object($record, 'Snapshot entry record');
+
+        if (($record['type'] ?? null) !== 'entry') {
             throw new ContractException('Snapshot location does not reference an entry record.');
         }
 

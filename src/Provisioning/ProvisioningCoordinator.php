@@ -147,10 +147,6 @@ final class ProvisioningCoordinator implements ProvisioningCoordinatorInterface
         try {
             $result = $this->lock->write($callback);
 
-            if (!$result instanceof ProvisioningResult) {
-                throw new \LogicException('The provisioning backend returned an invalid result.');
-            }
-
             $this->catalog->clear();
             $this->snapshots->clear();
             $this->dispatcher->dispatch(
@@ -180,7 +176,7 @@ final class ProvisioningCoordinator implements ProvisioningCoordinatorInterface
     /**
      * Validates, trims, and de-duplicates module identifiers.
      *
-     * @param list<string> $modules Candidate module identifiers.
+     * @param array<array-key, mixed> $modules Candidate module identifiers.
      * @param bool $allowEmpty Whether an empty list means all installed translations.
      *
      * @return list<string>

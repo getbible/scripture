@@ -16,6 +16,22 @@ use GetBible\Scripture\Exception\ContractException;
 /**
  * Builds the compact random-access index while records are being validated.
  *
+ * @phpstan-type RecordLocation array{offset: int, length: int}
+ * @phpstan-type ChapterIndex array{
+ *     number: int,
+ *     introductions: list<RecordLocation>,
+ *     verses: array<string, RecordLocation>
+ * }
+ * @phpstan-type BookIndex array{
+ *     testament: int,
+ *     position: int,
+ *     name: array{base64: string, encoding: string, sha256: string, size: int, utf8?: string},
+ *     abbreviation: array{base64: string, encoding: string, sha256: string, size: int, utf8?: string},
+ *     versification: array{base64: string, encoding: string, sha256: string, size: int, utf8?: string},
+ *     introductions: list<RecordLocation>,
+ *     chapters: array<array-key, ChapterIndex>
+ * }
+ *
  * @since 0.1.0
  */
 final class SnapshotRecordObserver implements RecordObserverInterface
@@ -39,7 +55,7 @@ final class SnapshotRecordObserver implements RecordObserverInterface
     /**
      * Indexed books and chapters.
      *
-     * @var array<string, array<string, mixed>>
+     * @var array<string, BookIndex>
      * @since 0.1.0
      */
     private array $books = [];
@@ -47,7 +63,7 @@ final class SnapshotRecordObserver implements RecordObserverInterface
     /**
      * Module and testament introduction record locations.
      *
-     * @var list<array{offset: int, length: int}>
+     * @var list<RecordLocation>
      * @since 0.1.0
      */
     private array $introductions = [];

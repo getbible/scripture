@@ -226,7 +226,7 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
                 fn (): int => $this->extractor->streamModule($module, $stream),
             );
 
-            if (!is_int($written) || $written < 0) {
+            if ($written < 0) {
                 throw new ContractException('Native module extraction returned an invalid byte count.');
             }
 
@@ -240,7 +240,7 @@ final class TranslationSnapshotManager implements SnapshotManagerInterface
 
             $stats = fstat($stream);
 
-            if (!is_array($stats) || ($stats['size'] ?? null) !== $written) {
+            if (!is_array($stats) || $stats['size'] !== $written) {
                 throw new ContractException('Native module byte count does not match its staged stream.');
             }
 

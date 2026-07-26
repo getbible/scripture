@@ -6,5 +6,5 @@ parameters:
     tmpDir: build/phpstan
     treatPhpDocTypesAsCertain: true
     reportUnmatchedIgnoredErrors: true
-    stubFiles:
+    scanFiles:
         - stubs/getbible-sword.php

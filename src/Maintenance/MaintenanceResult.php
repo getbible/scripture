@@ -16,15 +16,31 @@ use GetBible\Scripture\Provisioning\ProvisioningResult;
 final class MaintenanceResult
 {
     /**
+     * Ordered validated per-module outcomes.
+     *
+     * @var list<MaintenanceModuleResult>
+     * @since 0.3.0
+     */
+    private array $modules;
+
+    /**
+     * Ordered validated operation-level errors.
+     *
+     * @var list<string>
+     * @since 0.3.0
+     */
+    private array $errors;
+
+    /**
      * Creates a complete maintenance outcome.
      *
      * @param string $operation Stable operation name.
      * @param \DateTimeImmutable $startedAt Start time.
      * @param \DateTimeImmutable $completedAt Completion time.
      * @param bool $due Whether interval policy required work.
-     * @param list<MaintenanceModuleResult> $modules Per-module outcomes.
+     * @param array<array-key, mixed> $modules Per-module outcomes.
      * @param ProvisioningResult|null $provisioning Optional remote provisioning outcome.
-     * @param list<string> $errors Operation-level errors.
+     * @param array<array-key, mixed> $errors Operation-level errors.
      * @param string|null $skipReason Reason interval work was skipped.
      *
      * @since 0.3.0
@@ -34,29 +50,37 @@ final class MaintenanceResult
         private \DateTimeImmutable $startedAt,
         private \DateTimeImmutable $completedAt,
         private bool $due,
-        private array $modules,
+        array $modules,
         private ?ProvisioningResult $provisioning,
-        private array $errors,
+        array $errors,
         private ?string $skipReason = null,
     ) {
         if (trim($operation) === '' || $completedAt < $startedAt) {
             throw new \InvalidArgumentException('Maintenance operation and chronological timestamps are required.');
         }
 
+        $validatedModules = [];
+
         foreach ($modules as $module) {
             if (!$module instanceof MaintenanceModuleResult) {
                 throw new \InvalidArgumentException('Maintenance results must contain module outcomes.');
             }
+
+            $validatedModules[] = $module;
         }
+
+        $validatedErrors = [];
 
         foreach ($errors as $error) {
             if (!is_string($error) || trim($error) === '') {
                 throw new \InvalidArgumentException('Maintenance errors must be non-empty strings.');
             }
+
+            $validatedErrors[] = $error;
         }
 
-        $this->modules = array_values($modules);
-        $this->errors = array_values($errors);
+        $this->modules = $validatedModules;
+        $this->errors = $validatedErrors;
     }
 
     /**

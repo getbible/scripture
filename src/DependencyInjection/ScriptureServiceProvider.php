@@ -77,7 +77,7 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
         $container->share(
             ModuleExtractorInterface::class,
             static fn (Container $container): ModuleExtractorInterface => new SwordEngineAdapter(
-                $container->get(Configuration::class)->modulePath(),
+                ContainerService::get($container, Configuration::class)->modulePath(),
             ),
             true,
         );
@@ -89,42 +89,42 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
         $container->share(
             ModuleRootLockInterface::class,
             static fn (Container $container): ModuleRootLockInterface => new FileModuleRootLock(
-                $container->get(Configuration::class),
+                ContainerService::get($container, Configuration::class),
             ),
             true,
         );
         $container->share(
             MaintenanceLockInterface::class,
             static fn (Container $container): MaintenanceLockInterface => new FileMaintenanceLock(
-                $container->get(Configuration::class),
+                ContainerService::get($container, Configuration::class),
             ),
             true,
         );
         $container->share(
             MaintenanceStateStoreInterface::class,
             static fn (Container $container): MaintenanceStateStoreInterface => new JsonMaintenanceStateStore(
-                $container->get(Configuration::class),
+                ContainerService::get($container, Configuration::class),
             ),
             true,
         );
         $container->share(
             ModuleCatalogInterface::class,
             static fn (Container $container): ModuleCatalogInterface => new ModuleCatalog(
-                $container->get(ModuleExtractorInterface::class),
-                $container->get(ContractV1ValidatorInterface::class),
+                ContainerService::get($container, ModuleExtractorInterface::class),
+                ContainerService::get($container, ContractV1ValidatorInterface::class),
             ),
             true,
         );
         $container->share(
             SnapshotManagerInterface::class,
             static fn (Container $container): SnapshotManagerInterface => new TranslationSnapshotManager(
-                $container->get(Configuration::class),
-                $container->get(ClockInterface::class),
-                $container->get(ModuleCatalogInterface::class),
-                $container->get(ModuleExtractorInterface::class),
-                $container->get(ContractV1ValidatorInterface::class),
-                $container->get(DispatcherInterface::class),
-                $container->get(ModuleRootLockInterface::class),
+                ContainerService::get($container, Configuration::class),
+                ContainerService::get($container, ClockInterface::class),
+                ContainerService::get($container, ModuleCatalogInterface::class),
+                ContainerService::get($container, ModuleExtractorInterface::class),
+                ContainerService::get($container, ContractV1ValidatorInterface::class),
+                ContainerService::get($container, DispatcherInterface::class),
+                ContainerService::get($container, ModuleRootLockInterface::class),
             ),
             true,
         );
@@ -136,42 +136,42 @@ final class ScriptureServiceProvider implements ServiceProviderInterface
         $container->share(
             ProvisioningCoordinatorInterface::class,
             static fn (Container $container): ProvisioningCoordinatorInterface => new ProvisioningCoordinator(
-                $container->get(ModuleProvisionerInterface::class),
-                $container->get(ModuleRootLockInterface::class),
-                $container->get(ModuleCatalogInterface::class),
-                $container->get(SnapshotManagerInterface::class),
-                $container->get(DispatcherInterface::class),
+                ContainerService::get($container, ModuleProvisionerInterface::class),
+                ContainerService::get($container, ModuleRootLockInterface::class),
+                ContainerService::get($container, ModuleCatalogInterface::class),
+                ContainerService::get($container, SnapshotManagerInterface::class),
+                ContainerService::get($container, DispatcherInterface::class),
             ),
             true,
         );
         $container->share(
             MaintenanceServiceInterface::class,
             static fn (Container $container): MaintenanceServiceInterface => new MaintenanceService(
-                $container->get(Configuration::class),
-                $container->get(ClockInterface::class),
-                $container->get(ModuleCatalogInterface::class),
-                $container->get(SnapshotManagerInterface::class),
-                $container->get(ProvisioningCoordinatorInterface::class),
-                $container->get(MaintenanceStateStoreInterface::class),
-                $container->get(MaintenanceLockInterface::class),
-                $container->get(DispatcherInterface::class),
+                ContainerService::get($container, Configuration::class),
+                ContainerService::get($container, ClockInterface::class),
+                ContainerService::get($container, ModuleCatalogInterface::class),
+                ContainerService::get($container, SnapshotManagerInterface::class),
+                ContainerService::get($container, ProvisioningCoordinatorInterface::class),
+                ContainerService::get($container, MaintenanceStateStoreInterface::class),
+                ContainerService::get($container, MaintenanceLockInterface::class),
+                ContainerService::get($container, DispatcherInterface::class),
             ),
             true,
         );
         $container->share(
             ScheduledRefreshHandler::class,
             static fn (Container $container): ScheduledRefreshHandler => new ScheduledRefreshHandler(
-                $container->get(MaintenanceServiceInterface::class),
+                ContainerService::get($container, MaintenanceServiceInterface::class),
             ),
             true,
         );
         $container->share(
             ScriptureInterface::class,
             static fn (Container $container): ScriptureInterface => new Scripture(
-                $container->get(ModuleCatalogInterface::class),
-                $container->get(SnapshotManagerInterface::class),
-                $container->get(ProvisioningCoordinatorInterface::class),
-                $container->get(MaintenanceServiceInterface::class),
+                ContainerService::get($container, ModuleCatalogInterface::class),
+                ContainerService::get($container, SnapshotManagerInterface::class),
+                ContainerService::get($container, ProvisioningCoordinatorInterface::class),
+                ContainerService::get($container, MaintenanceServiceInterface::class),
             ),
             true,
         );

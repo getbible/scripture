@@ -248,6 +248,7 @@ final class TranslationSnapshotManagerTest extends TestCase
         );
 
         foreach ($iterator as $item) {
+            /** @var \SplFileInfo $item */
             if ($item->isDir()) {
                 rmdir($item->getPathname());
             } else {

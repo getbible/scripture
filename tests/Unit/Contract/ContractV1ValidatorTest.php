@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Tests\Unit\Contract;
 
 use GetBible\Scripture\Contract\ContractV1Validator;
+use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Exception\ContractException;
 use PHPUnit\Framework\TestCase;
 
@@ -226,7 +227,7 @@ final class ContractV1ValidatorTest extends TestCase
 
         foreach ($lines as $line) {
             $record = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
-            self::assertIsArray($record);
+            $record = StructuredData::object($record, 'Test fixture record');
 
             if (($record['type'] ?? null) !== 'footer') {
                 $records[] = $record;

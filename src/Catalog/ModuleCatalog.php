@@ -68,7 +68,7 @@ final class ModuleCatalog implements ModuleCatalogInterface
 
             $stats = fstat($stream);
 
-            if (!is_array($stats) || ($stats['size'] ?? null) !== $written) {
+            if (!is_array($stats) || $stats['size'] !== $written) {
                 throw new ContractException('Native module-list byte count does not match its stream.');
             }
 

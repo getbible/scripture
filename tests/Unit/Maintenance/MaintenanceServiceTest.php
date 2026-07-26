@@ -262,10 +262,6 @@ final class MaintenanceServiceTest extends TestCase
         $reflection = new \ReflectionClass(SnapshotIndex::class);
         $snapshot = $reflection->newInstanceWithoutConstructor();
 
-        if (!$snapshot instanceof SnapshotIndex) {
-            throw new \RuntimeException('Unable to create a type-safe SnapshotIndex test object.');
-        }
-
         return new class ($snapshot) implements SnapshotManagerInterface {
             /**
              * Number of get calls.

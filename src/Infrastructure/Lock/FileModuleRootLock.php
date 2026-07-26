@@ -18,7 +18,7 @@ final class FileModuleRootLock implements ModuleRootLockInterface
     /**
      * Absolute lock-file path.
      *
-     * @var string
+     * @var BoundedFileLock
      * @since 0.2.0
      */
     private BoundedFileLock $lock;
