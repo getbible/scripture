@@ -172,7 +172,9 @@ final class SnapshotIndex
             fclose($this->stream);
         }
 
-        $this->lease->release();
+        if (isset($this->lease)) {
+            $this->lease->release();
+        }
     }
 
     /**

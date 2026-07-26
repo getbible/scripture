@@ -212,6 +212,10 @@ jobs:
 
       - name: Install released getbible/sword through PIE
         shell: bash
+        env:
+          COMPOSER_AUTH: >-
+            {"github-oauth":{"github.com":"${{ github.token }}"}}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           curl \
@@ -227,7 +231,7 @@ jobs:
           echo \
             '19a31ddd4bfd08b9eb5eaad2e5f63e76e7919cae7683852da41c80da704ad6c0  '"$RUNNER_TEMP"'/pie.phar' \
             | sha256sum --check --strict
-          php "$RUNNER_TEMP/pie.phar" install --no-cache getbible/sword
+          php "$RUNNER_TEMP/pie.phar" install --no-cache -vvv getbible/sword
           php --ri getbiblesword
 
       - name: Install Composer dependencies
