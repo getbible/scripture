@@ -17,6 +17,12 @@ When a translation is requested:
 Only the compact index is loaded into memory. Verse records are read by exact
 offset from `module.ndjson`.
 
+## Process cache
+
+Each PHP process retains at most 32 open snapshot readers in least-recently-used
+order. A cached reader is reused only while its generation and index digest
+still match the active pointer. Eviction releases its shared generation lease.
+
 ## Generation identity
 
 The validated footer `stream_sha256` names the generation. The generated time is
@@ -50,6 +56,23 @@ can run `scripture:refresh --if-due` from cron or a systemd timer. See
 
 ## Cleanup
 
-The first release retains prior immutable generations so active readers cannot
-lose files. Bounded generation cleanup is a later hardening phase and must use
-reader-aware retention.
+The active generation and one valid prior generation are retained. Each open
+snapshot holds a shared reader lease. Cleanup skips any old generation whose
+lease cannot be acquired exclusively, so an active reader never loses the files
+it already opened.
+
+Under the bounded warm lock, maintenance also removes abandoned
+`.staging-*` and `.corrupt-*` directories plus `current.*.tmp` files after one
+hour.
+
+## Recovery
+
+The active pointer binds the selected index SHA-256. The index binds the full
+module file size and SHA-256, and every indexed entry binds its canonical record
+SHA-256. Reads therefore detect pointer, index, stream, offset, and record
+corruption before returning a domain object.
+
+When the active pointer or generation is invalid, the manager selects a valid
+cached generation and repairs the pointer atomically. If no valid generation is
+available, it performs a locked native export and activates it only after full
+validation. Failed recovery leaves every previously valid generation unchanged.

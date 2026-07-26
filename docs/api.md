@@ -12,9 +12,53 @@ $container = ContainerFactory::create($configuration);
 $scripture = $container->get(ScriptureInterface::class);
 ```
 
+To load the versioned JSON document written by `scripture:setup`:
+
+```php
+$container = ContainerFactory::create(
+    configuration: null,
+    configurationPath: '/etc/getbible/scripture.json',
+);
+$scripture = $container->get(ScriptureInterface::class);
+```
+
 Applications already using Joomla DI can register `ScriptureServiceProvider`
 with their own container and pre-register `Configuration` when they need custom
 values.
+
+## Programmatic setup
+
+Applications can persist validated settings and warm installed translations
+through the same service used by the interactive command:
+
+```php
+use GetBible\Scripture\Setup\SetupRequest;
+use GetBible\Scripture\Setup\SetupServiceInterface;
+
+/** @var SetupServiceInterface $setup */
+$setup = $container->get(SetupServiceInterface::class);
+
+$result = $setup->apply(new SetupRequest(
+    configurationPath: '/etc/getbible/scripture.json',
+    values: [
+        'module_path' => '/var/lib/getbible/sword',
+        'cache_path' => '/var/cache/getbible/scripture',
+        'modules' => ['KJV'],
+        'auto_refresh' => true,
+    ],
+    warm: true,
+));
+
+if (!$result->succeeded()) {
+    throw new RuntimeException(
+        json_encode($result->toArray(), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
+    );
+}
+```
+
+`SetupServiceInterface` never invokes PIE, Composer, a system package manager,
+or a module download. It changes only the application-owned JSON configuration
+and optionally warms modules already available to the native runtime.
 
 ## Scripture service
 
@@ -60,8 +104,11 @@ $translation->books();
 $translation->book('John');
 $translation->bookByPosition(testament: 2, book: 4);
 $translation->verses('John', 3, 16, 18);
-$translation->configEntries('DistributionLicense');
+$translation->configEntriesNamed('DistributionLicense');
 $translation->rawExportPath();
+$translation->activatedAt();
+$translation->expiresAt();
+$translation->generationId();
 ```
 
 Configuration entries are ordered and repeated keys are preserved.
@@ -142,5 +189,7 @@ The default Joomla dispatcher emits:
 - `onGetBibleScriptureMaintenanceCompleted`
 - `onGetBibleScriptureMaintenanceFailed`
 
-Each event contains the module name and the relevant snapshot or exception.
-Listeners must not mutate an active generation.
+Event arguments contain the relevant module, operation, result, snapshot, or
+exception for that lifecycle boundary. Listeners must not mutate an active
+generation. Listener exceptions are contained so an observer cannot turn a
+committed core operation into a reported failure.

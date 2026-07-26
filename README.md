@@ -14,17 +14,32 @@ entire Bible object graph into every PHP process.
 The package is deliberately Bible-only. Non-Bible SWORD modules remain visible
 in the low-level catalog but are not exposed as Scripture translations.
 
-## Status
+## Capabilities
 
-Phases 0–3 are implemented. Installed SWORD modules are production-readable;
-the package exposes capability-driven provisioning, bounded reader/writer
-locking, durable interval state, per-module outcomes, Joomla Console commands,
-and a Joomla Scheduled Tasks bridge. The current native ABI still reports
-remote mutation as unavailable until its additive provisioning API is released.
-See the
-[roadmap](docs/roadmap.md) and [provisioning boundary](docs/provisioning.md).
+Installed SWORD Bible modules are exposed through validated, immutable
+snapshots. The package provides bounded reader/writer locking, durable refresh
+state, per-module outcomes, Joomla Console commands, and a Joomla Scheduled
+Tasks bridge.
 
-## Requirements
+The released native ABI lists and exports installed modules. It does not
+download, update, or remove CrossWire modules. Those operations remain disabled
+unless the application injects a provisioner that explicitly advertises and
+implements them. See the [provisioning boundary](docs/provisioning.md).
+
+## Getting started
+
+### Product-distributed runtime
+
+People receiving an application should receive PHP, the native extension, the
+Composer dependencies, and policy-approved SWORD modules as one tested runtime.
+They should not need a compiler, PIE, or Composer on the production host. The
+[shipping and deployment guide](docs/distribution.md) provides a concrete
+container build and the equivalent installer contract for application
+distributors.
+
+### Existing Composer project
+
+Direct library integration requires:
 
 - Linux with PHP 8.2, 8.3, 8.4, or 8.5.
 - The `getbiblesword` PHP extension, installed through PIE.
@@ -38,7 +53,26 @@ php --ri getbiblesword
 composer require getbible/scripture
 ```
 
-## Quick start
+The extension check is intentionally strict. Composer treats PHP extensions as
+platform requirements; it verifies that `ext-getbiblesword` is loaded but does
+not install it. Composer also does not execute scripts declared by dependency
+packages. See [installation and setup](docs/installation.md) for the exact
+boundary and supported deployment choices.
+
+### Interactive setup
+
+After Composer installation, inspect the runtime and configure the library:
+
+```bash
+vendor/bin/getbible-scripture scripture:doctor
+vendor/bin/getbible-scripture scripture:setup
+```
+
+`scripture:setup` validates the loaded native runtime, module and cache paths,
+installed Bible modules, refresh policy, and permissions. It does not invoke
+PIE and cannot download CrossWire modules through ABI v1.
+
+### Programmatic setup
 
 ```php
 <?php
@@ -60,6 +94,17 @@ $container = ContainerFactory::create($configuration);
 
 /** @var ScriptureInterface $scripture */
 $scripture = $container->get(ScriptureInterface::class);
+
+$initialization = $scripture->initialize(['KJV']);
+
+if (!$initialization->succeeded()) {
+    throw new RuntimeException(
+        json_encode(
+            $initialization->toArray(),
+            JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR,
+        ),
+    );
+}
 
 $kjv = $scripture->translation('KJV');
 $john316 = $kjv->book('John')->chapter(3)->verse(16);
@@ -88,11 +133,14 @@ The first request for an installed translation performs one full native export,
 validates it, and creates an immutable indexed generation. Later requests open
 that generation and hydrate only the requested objects.
 
-Initialize configured translations and run interval-based maintenance:
+Run interval-based maintenance from the application scheduler:
 
 ```php
-$initialization = $scripture->initialize();
 $maintenance = $scripture->refreshIfDue();
+
+if (!$maintenance->succeeded()) {
+    // Send $maintenance->toArray() to the application's operational log.
+}
 ```
 
 No constructor performs network or full-module work. Both methods return
@@ -116,8 +164,10 @@ projection.
 
 ## Configuration
 
-Configuration precedence is explicit array values, environment values, and
-documented defaults:
+Configuration precedence depends on the entry point. Explicit configuration
+objects always win. Interactive or programmatic setup applies request values,
+then environment values, then persisted JSON, then documented defaults.
+Normal container loading applies environment values over persisted JSON.
 
 | Key | Environment variable | Default |
 |---|---|---|
@@ -135,13 +185,14 @@ See [configuration](docs/configuration.md) for operational details.
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Installation and setup](docs/installation.md)
 - [Public API](docs/api.md)
 - [Configuration](docs/configuration.md)
 - [Contract v1 mapping](docs/contract-v1.md)
 - [Caching and refresh](docs/caching.md)
 - [Module provisioning](docs/provisioning.md)
 - [Production operations](docs/operations.md)
-- [Roadmap](docs/roadmap.md)
+- [Shipping and deployment](docs/distribution.md)
 - [Releasing](docs/releasing.md)
 
 ## License

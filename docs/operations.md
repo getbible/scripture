@@ -39,6 +39,8 @@ Composer exposes the Joomla Console application as
 `vendor/bin/getbible-scripture`.
 
 ```bash
+vendor/bin/getbible-scripture scripture:doctor --json
+vendor/bin/getbible-scripture scripture:setup
 vendor/bin/getbible-scripture scripture:status
 vendor/bin/getbible-scripture scripture:initialize --module=KJV --module=WEB
 vendor/bin/getbible-scripture scripture:initialize --all
@@ -46,10 +48,17 @@ vendor/bin/getbible-scripture scripture:refresh --module=KJV
 vendor/bin/getbible-scripture scripture:refresh --if-due
 ```
 
-Every command writes deterministic JSON. Initialization and refresh return exit
-code `0` only when the complete result succeeds, and `1` for partial or complete
-failure. Bootstrap and uncaught application failures use a non-zero Joomla
-Console exit code.
+Doctor is read-only. Setup saves validated application configuration and can
+warm already-installed translations; it never installs the native extension or
+downloads modules. Both accept `--config=/absolute/path.json`. Setup also uses
+`GETBIBLE_SCRIPTURE_CONFIG_PATH` when the option is absent and prompts for a
+path only in an interactive terminal.
+
+Commands emit deterministic JSON with `--json` or non-interactive input.
+Interactive setup prints a concise summary followed by the same structured
+result. Initialization and refresh return exit code `0` only when the complete
+result succeeds, and `1` for partial or complete failure. Bootstrap, readiness,
+and uncaught application failures use a non-zero Joomla Console exit code.
 
 `--all` remains an explicit operation. It also requires
 `GETBIBLE_SCRIPTURE_PROVISIONING_ENABLED=true` and a native backend that
@@ -73,6 +82,17 @@ GETBIBLE_SCRIPTURE_LOCK_TIMEOUT=30
 The PHP-FPM and scheduler users must share read access to the SWORD root and
 read/write access to the cache root. Run maintenance as the same operating
 system identity as the application whenever possible.
+
+For file-based configuration, set:
+
+```dotenv
+GETBIBLE_SCRIPTURE_CONFIG_PATH=/etc/getbible/scripture.json
+```
+
+The setup command writes only allowlisted settings through an atomic
+same-directory replacement, refuses a symlink target, and gives a new file mode
+`0600`. Environment values remain available for deployments that manage
+configuration outside the application.
 
 ## Cron
 
@@ -135,7 +155,7 @@ sudo systemctl enable --now getbible-scripture.timer
 systemctl list-timers getbible-scripture.timer
 ```
 
-If the future native provisioner writes to the SWORD root, change its systemd
+If an injected native provisioner writes to the SWORD root, change its systemd
 path allowance from `ReadOnlyPaths` to the narrow required `ReadWritePaths`.
 
 ## Joomla Scheduled Tasks
@@ -160,10 +180,13 @@ the CMS task can run daily without forcing a monthly refresh on every run.
 Use:
 
 ```bash
+vendor/bin/getbible-scripture scripture:doctor --json
 vendor/bin/getbible-scripture scripture:status
 ```
 
-The JSON includes:
+Doctor verifies configuration parsing, native extension compatibility, module
+root access, cache access, installed modules, and warm-up readiness without
+changing state. Status reports:
 
 - whether maintenance is due;
 - the next due time;

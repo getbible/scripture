@@ -11,6 +11,37 @@
 A userland Composer package cannot register PHP INI directives. The package does
 not claim custom `ini_set()` support.
 
+## Configuration file
+
+`scripture:setup` writes an application-owned JSON document using the contract
+identifier `getbible.scripture.configuration/v1`. Supply its absolute path with
+`--config` or `GETBIBLE_SCRIPTURE_CONFIG_PATH`; no implicit file location is
+used.
+
+Setup precedence is:
+
+1. setup command options;
+2. matching `GETBIBLE_SCRIPTURE_*` environment variables;
+3. values already stored in the JSON document;
+4. defaults.
+
+Normal `scripture:initialize`, `scripture:refresh`, and `scripture:status`
+commands load the document when `GETBIBLE_SCRIPTURE_CONFIG_PATH` is set. Those
+maintenance commands do not accept `--config`.
+
+Programmatic applications can load the same document explicitly:
+
+```php
+$container = ContainerFactory::create(
+    configuration: null,
+    configurationPath: '/etc/getbible/scripture.json',
+);
+```
+
+The repository accepts only allowlisted settings, refuses a symlink target,
+persists through an atomic same-directory replacement, gives a new parent
+directory mode `0700`, and gives a new file mode `0600`.
+
 ## Settings
 
 ### `module_path`

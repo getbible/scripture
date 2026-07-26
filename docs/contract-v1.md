@@ -82,7 +82,7 @@ Repeated names and source order are not collapsed into associative arrays.
 ## Whole-stream validation
 
 JSON Schema validation alone is insufficient. The package independently checks
-sequence, phase order, framing, byte envelopes, annotation reconstruction,
+sequence, record ordering, framing, byte envelopes, annotation reconstruction,
 artifact state, counts, footer success, and the exact stream digest.
 
 The current reference Python validator can return process exit zero for a
