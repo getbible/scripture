@@ -139,4 +139,57 @@ final class LockClassesTest extends TestCase
         (new BoundedFileLock($this->directory . '/invalid-mode.lock', 1))
             ->synchronized(0, static fn (): null => null);
     }
+
+    /**
+     * Verifies callback failures still release the advisory lock.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testBoundedLockReleasesAfterCallbackFailure(): void
+    {
+        $lock = new BoundedFileLock($this->directory . '/failure/lifecycle.lock', 1);
+
+        try {
+            $lock->synchronized(
+                LOCK_EX,
+                static function (): never {
+                    throw new \RuntimeException('Expected callback failure.');
+                },
+            );
+            self::fail('The callback failure was not propagated.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Expected callback failure.', $exception->getMessage());
+        }
+
+        self::assertSame(
+            'reacquired',
+            $lock->synchronized(LOCK_EX, static fn (): string => 'reacquired'),
+        );
+    }
+
+    /**
+     * Verifies a contended advisory lock fails within its configured bound.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testBoundedLockTimesOutWhenContended(): void
+    {
+        self::assertTrue(mkdir($this->directory, 0700, true));
+        $path = $this->directory . '/contended.lock';
+        $holder = fopen($path, 'c+b');
+        self::assertIsResource($holder);
+        self::assertTrue(flock($holder, LOCK_EX | LOCK_NB));
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Timed out after 1 seconds');
+            (new BoundedFileLock($path, 1))
+                ->synchronized(LOCK_EX, static fn (): null => null);
+        } finally {
+            flock($holder, LOCK_UN);
+            fclose($holder);
+        }
+    }
 }

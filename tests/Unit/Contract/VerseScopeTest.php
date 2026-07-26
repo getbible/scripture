@@ -106,6 +106,66 @@ final class VerseScopeTest extends TestCase
     }
 
     /**
+     * Verifies each introduction coordinate family is supported.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testAcceptsAllIntroductionCoordinateFamilies(): void
+    {
+        $base = $this->scope(3);
+        $base['book_abbreviation'] = null;
+        $base['book_name'] = null;
+        $coordinates = [
+            'module' => [0, 0, 0, 0],
+            'testament' => [1, 0, 0, 0],
+            'book' => [1, 1, 0, 0],
+        ];
+
+        foreach ($coordinates as $introduction => [$testament, $book, $chapter, $verse]) {
+            $scope = $base;
+            $scope['intro_scope'] = $introduction;
+            $scope['testament'] = $testament;
+            $scope['book'] = $book;
+            $scope['chapter'] = $chapter;
+            $scope['verse'] = $verse;
+
+            if ($book > 0) {
+                $scope['book_abbreviation'] = $this->scope(3)['book_abbreviation'];
+                $scope['book_name'] = $this->scope(3)['book_name'];
+            }
+
+            self::assertSame($introduction, VerseScope::fromArray($scope)->introductionScope());
+        }
+    }
+
+    /**
+     * Verifies invalid scope shape, coordinates, classifications, and bytes fail.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsMalformedScopeMembers(): void
+    {
+        $base = $this->scope(4);
+        $invalid = [
+            array_replace($base, ['type' => 'sword_key']),
+            array_replace($base, ['testament' => -1]),
+            array_replace($base, ['intro_scope' => 'unknown']),
+            array_replace($base, ['osis_reference' => null]),
+        ];
+
+        foreach ($invalid as $scope) {
+            try {
+                VerseScope::fromArray($scope);
+                self::fail('A malformed verse scope was accepted.');
+            } catch (ContractException $exception) {
+                self::assertNotSame('', $exception->getMessage());
+            }
+        }
+    }
+
+    /**
      * Loads one scope from the deterministic fixture line.
      *
      * @param int $line Zero-based fixture line.

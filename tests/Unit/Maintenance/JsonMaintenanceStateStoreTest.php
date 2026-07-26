@@ -103,6 +103,28 @@ final class JsonMaintenanceStateStoreTest extends TestCase
     }
 
     /**
+     * Verifies malformed JSON preserves the decoder failure as context.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testRejectsMalformedJsonState(): void
+    {
+        $store = $this->store();
+        $store->save(MaintenanceState::empty());
+        $statePath = $this->cachePath . '/maintenance/state.json';
+        self::assertNotFalse(file_put_contents($statePath, "{invalid\n"));
+
+        try {
+            $store->load();
+            self::fail('Malformed durable state was accepted.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Unable to decode durable maintenance state.', $exception->getMessage());
+            self::assertInstanceOf(\JsonException::class, $exception->getPrevious());
+        }
+    }
+
+    /**
      * Creates the state store for the isolated path.
      *
      * @return JsonMaintenanceStateStore

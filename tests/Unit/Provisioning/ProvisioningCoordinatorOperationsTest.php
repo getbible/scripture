@@ -162,8 +162,7 @@ final class ProvisioningCoordinatorOperationsTest extends TestCase
         string $operation,
         string $module,
         string $action,
-    ): ProvisioningResult
-    {
+    ): ProvisioningResult {
         return new ProvisioningResult($operation, [
             new ModuleProvisioningResult(
                 $module,

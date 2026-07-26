@@ -60,6 +60,19 @@ final class ContractValueObjectsTest extends TestCase
     }
 
     /**
+     * Verifies associative objects cannot conceal integer keys.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testStructuredObjectRejectsMixedKeyTypes(): void
+    {
+        $this->expectException(ContractException::class);
+        $this->expectExceptionMessage('non-string object key');
+        StructuredData::object([1 => 'one', 'name' => 'KJV'], 'object');
+    }
+
+    /**
      * Verifies SWORD enumerations retain the native code and producer name.
      *
      * @return void
@@ -181,6 +194,7 @@ final class ContractValueObjectsTest extends TestCase
                 ['named' => []],
                 [['name' => null, 'lists' => []]],
                 [['name' => $this->bytes('Type'), 'lists' => 'invalid']],
+                [['name' => $this->bytes('Type'), 'lists' => [['name' => null, 'values' => []]]]],
                 [[
                     'name' => $this->bytes('Type'),
                     'lists' => [['name' => $this->bytes('List'), 'values' => [['name' => null]]]],

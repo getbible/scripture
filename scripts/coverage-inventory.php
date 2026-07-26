@@ -7,9 +7,9 @@ declare(strict_types=1);
 /**
  * Produces a stable inventory from a PHPUnit Clover coverage report.
  *
- * The inventory deliberately reports coverage without imposing an arbitrary
- * percentage. Release policy can supply minimum statement and method
- * percentages as the optional second and third arguments.
+ * Release policy supplies minimum statement and method percentages as the
+ * optional second and third arguments. Every public or protected method must
+ * also be invoked at least once so a percentage cannot hide an untouched API.
  */
 
 if ($argc < 2 || $argc > 4) {
@@ -68,6 +68,9 @@ $coveredMethods = integerMetric($metrics, 'coveredmethods');
 $statementPercent = ratio($coveredStatements, $statements);
 $methodPercent = ratio($coveredMethods, $methods);
 $files = [];
+$nonPrivateMethods = 0;
+$calledNonPrivateMethods = 0;
+$uncalledNonPrivateMethods = [];
 
 foreach ($fileNodes as $fileNode) {
     $attributes = $fileNode->attributes();
@@ -85,6 +88,36 @@ foreach ($fileNodes as $fileNode) {
 
     $fileStatements = integerMetric($fileMetrics, 'statements');
     $fileCoveredStatements = integerMetric($fileMetrics, 'coveredstatements');
+    $fileUncalledMethods = [];
+
+    foreach ($fileNode->line as $lineNode) {
+        $line = $lineNode->attributes();
+
+        if (
+            $line === null
+            || (string) ($line['type'] ?? '') !== 'method'
+            || (string) ($line['visibility'] ?? '') === 'private'
+        ) {
+            continue;
+        }
+
+        $nonPrivateMethods++;
+
+        if (integerAttribute($line, 'count') > 0) {
+            $calledNonPrivateMethods++;
+            continue;
+        }
+
+        $method = [
+            'path' => relativePath($name),
+            'line' => integerAttribute($line, 'num'),
+            'method' => (string) ($line['name'] ?? '<unknown>'),
+            'visibility' => (string) ($line['visibility'] ?? '<unknown>'),
+        ];
+        $fileUncalledMethods[] = $method;
+        $uncalledNonPrivateMethods[] = $method;
+    }
+
     $files[] = [
         'path' => relativePath($name),
         'statements' => $fileStatements,
@@ -92,6 +125,7 @@ foreach ($fileNodes as $fileNode) {
         'statement_percent' => ratio($fileCoveredStatements, $fileStatements),
         'methods' => integerMetric($fileMetrics, 'methods'),
         'covered_methods' => integerMetric($fileMetrics, 'coveredmethods'),
+        'uncalled_non_private_methods' => $fileUncalledMethods,
     ];
 }
 
@@ -110,11 +144,15 @@ $inventory = [
         'methods' => $methods,
         'covered_methods' => $coveredMethods,
         'method_percent' => $methodPercent,
+        'non_private_methods' => $nonPrivateMethods,
+        'called_non_private_methods' => $calledNonPrivateMethods,
+        'uncalled_non_private_methods' => count($uncalledNonPrivateMethods),
     ],
     'minimums' => [
         'statement_percent' => $minimumStatements,
         'method_percent' => $minimumMethods,
     ],
+    'uncalled_non_private_methods' => $uncalledNonPrivateMethods,
     'files' => $files,
 ];
 
@@ -134,7 +172,8 @@ if (file_put_contents($jsonPath, $json . PHP_EOL, LOCK_EX) === false) {
 }
 
 $summary = sprintf(
-    "Coverage inventory: %d files, %.2f%% statements (%d/%d), %.2f%% methods (%d/%d).\n",
+    "Coverage inventory: %d files, %.2f%% statements (%d/%d), "
+    . "%.2f%% methods (%d/%d), non-private methods invoked %d/%d.\n",
     count($files),
     $statementPercent,
     $coveredStatements,
@@ -142,6 +181,8 @@ $summary = sprintf(
     $methodPercent,
     $coveredMethods,
     $methods,
+    $calledNonPrivateMethods,
+    $nonPrivateMethods,
 );
 
 fwrite(STDOUT, $summary);
@@ -155,6 +196,7 @@ if (is_string($summaryPath) && $summaryPath !== '') {
         . "|---|---:|---:|---:|\n"
         . "| Statements | %d | %d | %.2f%% |\n"
         . "| Methods | %d | %d | %.2f%% |\n"
+        . "| Non-private methods invoked | %d | %d | %.2f%% |\n"
         . "| Files in report | %d | — | — |\n",
         $coveredStatements,
         $statements,
@@ -162,9 +204,31 @@ if (is_string($summaryPath) && $summaryPath !== '') {
         $coveredMethods,
         $methods,
         $methodPercent,
+        $calledNonPrivateMethods,
+        $nonPrivateMethods,
+        ratio($calledNonPrivateMethods, $nonPrivateMethods),
         count($files),
     );
     file_put_contents($summaryPath, $markdown, FILE_APPEND | LOCK_EX);
+}
+
+if ($uncalledNonPrivateMethods !== []) {
+    fwrite(STDERR, "Coverage minimum not met: public or protected methods were never invoked.\n");
+
+    foreach ($uncalledNonPrivateMethods as $method) {
+        fwrite(
+            STDERR,
+            sprintf(
+                "- %s:%d %s %s()\n",
+                $method['path'],
+                $method['line'],
+                $method['visibility'],
+                $method['method'],
+            ),
+        );
+    }
+
+    exit(1);
 }
 
 if ($statementPercent < $minimumStatements || $methodPercent < $minimumMethods) {
@@ -179,6 +243,21 @@ if ($statementPercent < $minimumStatements || $methodPercent < $minimumMethods) 
         ),
     );
     exit(1);
+}
+
+/**
+ * Reads a non-negative integer from an arbitrary Clover attribute map.
+ */
+function integerAttribute(SimpleXMLElement $attributes, string $name): int
+{
+    $value = (string) ($attributes[$name] ?? '');
+
+    if ($value === '' || !ctype_digit($value)) {
+        fwrite(STDERR, sprintf("Coverage line attribute is missing or invalid: %s\n", $name));
+        exit(2);
+    }
+
+    return (int) $value;
 }
 
 /**
