@@ -30,6 +30,10 @@ $scripture->installAllTranslations();
 $scripture->refreshSelectedModules(['KJV']);
 $scripture->refreshModules();
 $scripture->removeTranslation('KJV');
+$scripture->initialize();
+$scripture->refresh();
+$scripture->refreshIfDue();
+$scripture->maintenanceStatus();
 ```
 
 `translations()` lists installed Bible modules. `translation()` opens the
@@ -40,6 +44,12 @@ Provisioning methods are stable even when the injected native backend cannot
 perform them. Inspect `provisioningCapabilities()` first. The default
 getBibleSword ABI v1 adapter accurately reports every mutating capability as
 unavailable and throws `ProvisioningUnavailableException` when called.
+
+`initialize()`, `refresh()`, and `refreshIfDue()` return `MaintenanceResult`
+objects with ordered snapshot outcomes, the optional native provisioning
+result, operation errors, timestamps, and interval status. These operations
+continue across independent module failures and report partial failure through
+`succeeded()`.
 
 ## Translation
 
@@ -128,6 +138,9 @@ The default Joomla dispatcher emits:
 - `onGetBibleScriptureProvisioningStarted`
 - `onGetBibleScriptureProvisioningCompleted`
 - `onGetBibleScriptureProvisioningFailed`
+- `onGetBibleScriptureMaintenanceStarted`
+- `onGetBibleScriptureMaintenanceCompleted`
+- `onGetBibleScriptureMaintenanceFailed`
 
 Each event contains the module name and the relevant snapshot or exception.
 Listeners must not mutate an active generation.

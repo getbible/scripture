@@ -16,19 +16,20 @@ in the low-level catalog but are not exposed as Scripture translations.
 
 ## Status
 
-Phases 0–2 are implemented. Installed SWORD modules are production-readable,
-and the package exposes capability-driven provisioning contracts with bounded
-reader/writer locking and per-module outcomes. The current native ABI still
-reports remote mutation as unavailable until its additive provisioning API is
-released. See the
+Phases 0–3 are implemented. Installed SWORD modules are production-readable;
+the package exposes capability-driven provisioning, bounded reader/writer
+locking, durable interval state, per-module outcomes, Joomla Console commands,
+and a Joomla Scheduled Tasks bridge. The current native ABI still reports
+remote mutation as unavailable until its additive provisioning API is released.
+See the
 [roadmap](docs/roadmap.md) and [provisioning boundary](docs/provisioning.md).
 
 ## Requirements
 
 - Linux with PHP 8.2, 8.3, 8.4, or 8.5.
 - The `getbiblesword` PHP extension, installed through PIE.
-- Joomla Framework DI, Event, Filesystem, and Registry packages, installed by
-  Composer.
+- Joomla Framework Console, DI, Event, Filesystem, and Registry packages,
+  installed by Composer.
 - A readable SWORD module root.
 
 ```bash
@@ -87,6 +88,16 @@ The first request for an installed translation performs one full native export,
 validates it, and creates an immutable indexed generation. Later requests open
 that generation and hydrate only the requested objects.
 
+Initialize configured translations and run interval-based maintenance:
+
+```php
+$initialization = $scripture->initialize();
+$maintenance = $scripture->refreshIfDue();
+```
+
+No constructor performs network or full-module work. Both methods return
+structured per-module results and continue safely across independent failures.
+
 ## Available data layers
 
 Every verse retains:
@@ -115,6 +126,9 @@ documented defaults:
 | `refresh_interval` | `GETBIBLE_SCRIPTURE_REFRESH_INTERVAL` | `P1M` |
 | `auto_refresh` | `GETBIBLE_SCRIPTURE_AUTO_REFRESH` | `true` |
 | `lock_timeout` | `GETBIBLE_SCRIPTURE_LOCK_TIMEOUT` | `30` seconds |
+| `modules` | `GETBIBLE_SCRIPTURE_MODULES` | All installed translations |
+| `provisioning_enabled` | `GETBIBLE_SCRIPTURE_PROVISIONING_ENABLED` | `false` |
+| `install_all` | `GETBIBLE_SCRIPTURE_INSTALL_ALL` | `false` |
 
 See [configuration](docs/configuration.md) for operational details.
 
@@ -126,6 +140,7 @@ See [configuration](docs/configuration.md) for operational details.
 - [Contract v1 mapping](docs/contract-v1.md)
 - [Caching and refresh](docs/caching.md)
 - [Module provisioning](docs/provisioning.md)
+- [Production operations](docs/operations.md)
 - [Roadmap](docs/roadmap.md)
 - [Releasing](docs/releasing.md)
 

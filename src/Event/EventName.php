@@ -77,6 +77,27 @@ final class EventName
     public const PROVISIONING_FAILED = 'onGetBibleScriptureProvisioningFailed';
 
     /**
+     * Emitted before a complete initialization or refresh run starts.
+     *
+     * @since 0.3.0
+     */
+    public const MAINTENANCE_STARTED = 'onGetBibleScriptureMaintenanceStarted';
+
+    /**
+     * Emitted after a complete initialization or refresh run completes.
+     *
+     * @since 0.3.0
+     */
+    public const MAINTENANCE_COMPLETED = 'onGetBibleScriptureMaintenanceCompleted';
+
+    /**
+     * Emitted when a complete initialization or refresh run throws.
+     *
+     * @since 0.3.0
+     */
+    public const MAINTENANCE_FAILED = 'onGetBibleScriptureMaintenanceFailed';
+
+    /**
      * Prevents instantiation of this constants-only class.
      *
      * @since 0.1.0

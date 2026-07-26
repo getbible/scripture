@@ -9,12 +9,14 @@ immutable, lazily hydrated Scripture objects.
 ```text
 Application
   -> ScriptureInterface
-    -> TranslationSnapshotManager
-      -> ContractV1Validator
-      -> ModuleExtractorInterface
-        -> SwordEngineAdapter
-          -> GetBible\Sword\Engine
-            -> getBibleSword 0.3.0 / SWORD 1.9.0
+    -> MaintenanceService
+      -> ProvisioningCoordinatorInterface
+      -> TranslationSnapshotManager
+        -> ContractV1Validator
+        -> ModuleExtractorInterface
+          -> SwordEngineAdapter
+            -> GetBible\Sword\Engine
+              -> getBibleSword 0.3.0 / SWORD 1.9.0
 ```
 
 The Joomla DI container is the composition root. Domain objects never fetch
@@ -88,6 +90,22 @@ and `ProvisioningCoordinatorInterface` allow the eventual native provisioning
 implementation to be injected without changing the Scripture API. Capability
 discovery keeps ABI limitations explicit. See [provisioning](provisioning.md).
 
+### Automated maintenance
+
+`MaintenanceServiceInterface` is the sole orchestration boundary for
+initialization, forced refresh, interval-gated refresh, and health status. A
+whole-run lock prevents overlapping scheduler executions. Within one run,
+translation failures are isolated and returned as immutable per-module
+outcomes.
+
+The durable `maintenance/state.json` records the last attempt, last complete
+success, last failure, failure summary, and consecutive failure count. Only a
+complete success advances the interval anchor. State is written to a
+synchronized temporary file and atomically renamed into place.
+
+Joomla Console commands, Joomla Scheduled Tasks integrations, cron, and systemd
+all invoke this same service. They do not reproduce lifecycle policy.
+
 ## SOLID application
 
 - Single responsibility: native extraction, validation, indexing, querying,
@@ -110,6 +128,9 @@ Every native export also holds a bounded shared module-root lifecycle lock.
 Provisioning holds the matching exclusive lock, so cooperating application
 processes cannot replace module files while the native engine reads them.
 
+A separate bounded maintenance lock serializes complete scheduled runs. Lock
+acquisition has a configurable timeout; it never waits indefinitely.
+
 The native extension serializes SWORD access within one PHP process. Different
 processes remain independent.
 
@@ -122,6 +143,11 @@ immutability does not make an in-place native install safe.
 A failed export, failed validation, failed index write, or failed activation
 removes its staging directory and leaves the active generation unchanged.
 Native exceptions retain their original status code as the previous exception.
+
+A partially failed maintenance run preserves the prior `last_success_at`, stores
+the new failure, and returns a non-zero console exit code. Healthy modules still
+complete, which prevents one malformed translation from starving every other
+translation.
 
 No constructor performs network I/O, module installation, or a full translation
 export.

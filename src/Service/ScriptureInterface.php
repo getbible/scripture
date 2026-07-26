@@ -11,6 +11,8 @@ use GetBible\Scripture\Domain\TranslationMetadata;
 use GetBible\Scripture\Domain\Verse;
 use GetBible\Scripture\Provisioning\ProvisioningResult;
 use GetBible\Scripture\Provisioning\ProvisioningCapabilities;
+use GetBible\Scripture\Maintenance\MaintenanceResult;
+use GetBible\Scripture\Maintenance\MaintenanceStatus;
 
 /**
  * Primary Bible-only application API.
@@ -19,6 +21,45 @@ use GetBible\Scripture\Provisioning\ProvisioningCapabilities;
  */
 interface ScriptureInterface
 {
+    /**
+     * Installs missing configured modules when supported and warms snapshots.
+     *
+     * @param list<string> $modules Explicit module targets or configuration defaults.
+     * @param bool $all Whether every policy-approved translation should be installed.
+     *
+     * @return MaintenanceResult
+     * @since 0.3.0
+     */
+    public function initialize(array $modules = [], bool $all = false): MaintenanceResult;
+
+    /**
+     * Refreshes remote modules when enabled and rebuilds snapshots.
+     *
+     * @param list<string> $modules Explicit module targets or configuration defaults.
+     *
+     * @return MaintenanceResult
+     * @since 0.3.0
+     */
+    public function refresh(array $modules = []): MaintenanceResult;
+
+    /**
+     * Refreshes only after the configured durable interval has elapsed.
+     *
+     * @param list<string> $modules Explicit module targets or configuration defaults.
+     *
+     * @return MaintenanceResult
+     * @since 0.3.0
+     */
+    public function refreshIfDue(array $modules = []): MaintenanceResult;
+
+    /**
+     * Returns current maintenance and native capability status.
+     *
+     * @return MaintenanceStatus
+     * @since 0.3.0
+     */
+    public function maintenanceStatus(): MaintenanceStatus;
+
     /**
      * Returns installed Bible translation metadata.
      *

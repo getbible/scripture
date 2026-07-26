@@ -34,10 +34,12 @@ can replace `AbiV1ModuleProvisioner` without changing the public Scripture API.
 ## Phase 3 — automated maintenance (`0.3.0`)
 
 - `initialize()`, `refresh()`, and `refreshIfDue()` over the native provisioner.
-- CLI maintenance commands.
-- Joomla Scheduled Tasks integration.
-- Systemd and cron examples.
-- Per-module results and lifecycle events.
+- Durable last-attempt, success, failure, and interval state.
+- Non-overlapping maintenance runs with per-module failure isolation.
+- Joomla Console initialization, refresh, and status commands.
+- Joomla Scheduled Tasks callable integration.
+- Systemd and cron deployment examples.
+- Deterministic JSON results, exit codes, and lifecycle events.
 
 ## Phase 4 — production hardening and `1.0.0`
 

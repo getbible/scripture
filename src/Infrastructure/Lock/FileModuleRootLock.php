@@ -7,7 +7,6 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Infrastructure\Lock;
 
 use GetBible\Scripture\Configuration\Configuration;
-use Joomla\Filesystem\Folder;
 
 /**
  * Implements bounded interprocess SWORD root locking with flock.
@@ -22,7 +21,7 @@ final class FileModuleRootLock implements ModuleRootLockInterface
      * @var string
      * @since 0.2.0
      */
-    private string $path;
+    private BoundedFileLock $lock;
 
     /**
      * Creates the shared application lifecycle lock.
@@ -31,9 +30,12 @@ final class FileModuleRootLock implements ModuleRootLockInterface
      *
      * @since 0.2.0
      */
-    public function __construct(private Configuration $configuration)
+    public function __construct(Configuration $configuration)
     {
-        $this->path = $configuration->cachePath() . '/locks/module-root.lock';
+        $this->lock = new BoundedFileLock(
+            $configuration->cachePath() . '/locks/module-root.lock',
+            $configuration->lockTimeout(),
+        );
     }
 
     /**
@@ -48,7 +50,7 @@ final class FileModuleRootLock implements ModuleRootLockInterface
      */
     public function read(callable $operation): mixed
     {
-        return $this->synchronized(LOCK_SH, $operation);
+        return $this->lock->synchronized(LOCK_SH, $operation);
     }
 
     /**
@@ -63,63 +65,6 @@ final class FileModuleRootLock implements ModuleRootLockInterface
      */
     public function write(callable $operation): mixed
     {
-        return $this->synchronized(LOCK_EX, $operation);
-    }
-
-    /**
-     * Acquires a bounded lock, invokes an operation, and always releases it.
-     *
-     * @template T
-     *
-     * @param int $mode LOCK_SH or LOCK_EX.
-     * @param callable(): T $operation Protected operation.
-     *
-     * @return T
-     * @since 0.2.0
-     */
-    private function synchronized(int $mode, callable $operation): mixed
-    {
-        $directory = dirname($this->path);
-
-        if (!Folder::create($directory, 0750)) {
-            throw new \RuntimeException(sprintf('Unable to create lifecycle lock directory "%s".', $directory));
-        }
-
-        $handle = fopen($this->path, 'c+b');
-
-        if (!is_resource($handle)) {
-            throw new \RuntimeException(sprintf('Unable to open lifecycle lock "%s".', $this->path));
-        }
-
-        $deadline = hrtime(true) + ($this->configuration->lockTimeout() * 1_000_000_000);
-        $acquired = false;
-
-        try {
-            do {
-                $acquired = flock($handle, $mode | LOCK_NB);
-
-                if ($acquired) {
-                    break;
-                }
-
-                usleep(50_000);
-            } while (hrtime(true) < $deadline);
-
-            if (!$acquired) {
-                throw new \RuntimeException(sprintf(
-                    'Timed out after %d seconds waiting for lifecycle lock "%s".',
-                    $this->configuration->lockTimeout(),
-                    $this->path,
-                ));
-            }
-
-            return $operation();
-        } finally {
-            if ($acquired) {
-                flock($handle, LOCK_UN);
-            }
-
-            fclose($handle);
-        }
+        return $this->lock->synchronized(LOCK_EX, $operation);
     }
 }

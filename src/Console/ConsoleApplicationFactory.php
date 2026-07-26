@@ -1,0 +1,69 @@
+<?php
+
+// SPDX-License-Identifier: GPL-2.0-only
+
+declare(strict_types=1);
+
+namespace GetBible\Scripture\Console;
+
+use GetBible\Scripture\Maintenance\MaintenanceServiceInterface;
+use Joomla\Console\Application;
+use Joomla\DI\Container;
+use Joomla\Event\DispatcherInterface;
+
+/**
+ * Creates the standalone Joomla Console maintenance application.
+ *
+ * @since 0.3.0
+ */
+final class ConsoleApplicationFactory
+{
+    /**
+     * Creates a configured console application from the Joomla DI container.
+     *
+     * @param Container $container Scripture composition root.
+     *
+     * @return Application
+     * @since 0.3.0
+     */
+    public static function create(Container $container): Application
+    {
+        $application = new Application();
+        $application->setName('GetBible Scripture');
+        $application->setVersion(self::version());
+        $application->setDispatcher($container->get(DispatcherInterface::class));
+        $maintenance = $container->get(MaintenanceServiceInterface::class);
+
+        if (!$maintenance instanceof MaintenanceServiceInterface) {
+            throw new \LogicException('The Joomla container returned an invalid maintenance service.');
+        }
+
+        $application->addCommand(new InitializeCommand($maintenance));
+        $application->addCommand(new RefreshCommand($maintenance));
+        $application->addCommand(new StatusCommand($maintenance));
+
+        return $application;
+    }
+
+    /**
+     * Reads the package version without introducing generated constants.
+     *
+     * @return string
+     * @since 0.3.0
+     */
+    private static function version(): string
+    {
+        $version = @file_get_contents(dirname(__DIR__, 2) . '/VERSION');
+
+        return is_string($version) && trim($version) !== '' ? trim($version) : 'unknown';
+    }
+
+    /**
+     * Prevents instantiation of this factory.
+     *
+     * @since 0.3.0
+     */
+    private function __construct()
+    {
+    }
+}
