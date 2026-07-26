@@ -7,6 +7,7 @@ declare(strict_types=1);
 namespace GetBible\Scripture\Tests\Unit\Contract;
 
 use GetBible\Scripture\Contract\ContractV1Validator;
+use GetBible\Scripture\Contract\RecordObserverInterface;
 use GetBible\Scripture\Contract\StructuredData;
 use GetBible\Scripture\Exception\ContractException;
 use PHPUnit\Framework\TestCase;
@@ -41,6 +42,87 @@ final class ContractV1ValidatorTest extends TestCase
             '12dfe5252316bc73232da8b9b0ebf5ca18c7839daa6b11189206d0a5e1ee6686',
             $result->streamSha256(),
         );
+    }
+
+    /**
+     * Verifies validated records are reported with exact stream locations.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testObserverReceivesEveryValidatedRecord(): void
+    {
+        $observer = new class () implements RecordObserverInterface {
+            /**
+             * Observed record types.
+             *
+             * @var list<string>
+             */
+            public array $types = [];
+
+            /**
+             * Observed byte offsets.
+             *
+             * @var list<int>
+             */
+            public array $offsets = [];
+
+            /**
+             * Observed serialized lengths.
+             *
+             * @var list<int>
+             */
+            public array $lengths = [];
+
+            /**
+             * Captures one validated record.
+             *
+             * @param array<string, mixed> $record Validated record.
+             * @param int $offset Record offset.
+             * @param int $length Serialized length.
+             *
+             * @return void
+             */
+            public function onRecord(array $record, int $offset, int $length): void
+            {
+                $type = $record['type'] ?? null;
+
+                if (!is_string($type)) {
+                    throw new \LogicException('A validated record must have a type.');
+                }
+
+                $this->types[] = $type;
+                $this->offsets[] = $offset;
+                $this->lengths[] = $length;
+            }
+        };
+        $stream = fopen(__DIR__ . '/../../Fixtures/test-bible.ndjson', 'rb');
+        self::assertIsResource($stream);
+
+        try {
+            (new ContractV1Validator())->validate($stream, $observer);
+        } finally {
+            fclose($stream);
+        }
+
+        self::assertSame(
+            ['header', 'module', 'config_entry', 'entry', 'entry', 'footer'],
+            $observer->types,
+        );
+        self::assertSame(0, $observer->offsets[0]);
+        self::assertSame(filesize(__DIR__ . '/../../Fixtures/test-bible.ndjson'), array_sum($observer->lengths));
+    }
+
+    /**
+     * Verifies validation accepts only readable stream resources.
+     *
+     * @return void
+     * @since 1.0.0
+     */
+    public function testNonStreamInputIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new ContractV1Validator())->validate(null);
     }
 
     /**

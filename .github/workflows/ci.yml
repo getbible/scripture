@@ -210,14 +210,13 @@ jobs:
             libbz2-dev libcurl4-openssl-dev libicu-dev liblzma-dev \
             libtool pkg-config unzip zlib1g-dev
 
-      - name: Install released getbible/sword through PIE
+      - name: Install published getbible/sword source through PIE
         shell: bash
-        env:
-          COMPOSER_AUTH: >-
-            {"github-oauth":{"github.com":"${{ github.token }}"}}
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          sword_version="0.1.0"
+          sword_archive="php_getbiblesword-${sword_version}-src.tgz"
+          sword_release="https://github.com/getbible/sword/releases/download/v${sword_version}"
           curl \
             --fail \
             --location \
@@ -231,7 +230,43 @@ jobs:
           echo \
             '19a31ddd4bfd08b9eb5eaad2e5f63e76e7919cae7683852da41c80da704ad6c0  '"$RUNNER_TEMP"'/pie.phar' \
             | sha256sum --check --strict
-          php "$RUNNER_TEMP/pie.phar" install --no-cache -vvv getbible/sword
+          curl \
+            --fail \
+            --location \
+            --proto '=https' \
+            --retry 3 \
+            --show-error \
+            --silent \
+            --tlsv1.2 \
+            --output "$RUNNER_TEMP/$sword_archive" \
+            "$sword_release/$sword_archive"
+          curl \
+            --fail \
+            --location \
+            --proto '=https' \
+            --retry 3 \
+            --show-error \
+            --silent \
+            --tlsv1.2 \
+            --output "$RUNNER_TEMP/$sword_archive.sha256" \
+            "$sword_release/$sword_archive.sha256"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum --check --strict "$sword_archive.sha256"
+          )
+          mkdir -p "$RUNNER_TEMP/getbiblesword"
+          tar \
+            --extract \
+            --gzip \
+            --file "$RUNNER_TEMP/$sword_archive" \
+            --directory "$RUNNER_TEMP/getbiblesword"
+          sword_root="$RUNNER_TEMP/getbiblesword/php_getbiblesword-${sword_version}"
+          test -f "$sword_root/composer.json"
+          test -f "$sword_root/vendor/getbiblesword/src/c_api.cpp"
+          php "$RUNNER_TEMP/pie.phar" repository:add path "$sword_root"
+          php "$RUNNER_TEMP/pie.phar" install \
+            --no-cache \
+            'getbible/sword:*@dev'
           php --ri getbiblesword
 
       - name: Install Composer dependencies
