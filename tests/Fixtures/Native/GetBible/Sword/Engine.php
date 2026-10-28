@@ -188,7 +188,7 @@ final class Engine
     {
         $written = fwrite($destination, $contents);
 
-        if ($written !== strlen($contents)) {
+        if ($written === false || $written !== strlen($contents)) {
             throw new \RuntimeException('Unable to write the fake native stream.');
         }
 

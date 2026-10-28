@@ -123,7 +123,7 @@ final class ModuleCatalogTest extends TestCase
                 ++$this->calls;
                 $written = fwrite($destination, $this->stream);
 
-                if ($written !== strlen($this->stream)) {
+                if ($written === false || $written !== strlen($this->stream)) {
                     throw new \RuntimeException('Unable to write the catalog fixture.');
                 }
 
